@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UltraHonk Proof Generator</title>
+    <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+    <h1>UltraHonk Proof Generator</h1>
+
+    <div class="form-group">
+        <label for="circuit">Circuit:</label>
+        <select id="circuit">
+            <option value="simple_circuit">Simple Circuit (x + y)</option>
+            <option value="fib_chain">Fibonacci Chain</option>
+            <option value="zkp_maze">ZKP Maze</option>
+        </select>
+    </div>
+
+    <div id="inputs"></div>
+
+    <button id="generate">Generate Proof</button>
+
+    <div id="output"></div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

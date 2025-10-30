@@ -1,0 +1,7 @@
+[package]
+name = "zkp_maze"
+type = "bin"
+authors = [""]
+compiler_version = ">=1.0.0"
+
+[dependencies]

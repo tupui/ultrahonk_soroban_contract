@@ -14,7 +14,7 @@ This script can:
 Example (local Quickstart):
     python scripts/invoke_ultrahonk.py invoke \
         --dataset tests/fib_chain/target \
-        --contract-id CD6HGS5V7XJPSPJ5HHPHUZXLYGZAJJC3L6QWR4YZG4NIRO65UYQ6KIYP \
+        --contract-id CDSR7GOJ2ZTUDQZI5WKG3BOG66KCYNJKW7RLRE6YJJ7CIS6XTQHYXTR7 \
         --network local --source-account alice --send no
 """
 
@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 
-DEFAULT_CONTRACT_ID = "CD6HGS5V7XJPSPJ5HHPHUZXLYGZAJJC3L6QWR4YZG4NIRO65UYQ6KIYP"
+DEFAULT_CONTRACT_ID = "CDSR7GOJ2ZTUDQZI5WKG3BOG66KCYNJKW7RLRE6YJJ7CIS6XTQHYXTR7"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DATASET_DIR = (REPO_ROOT / "tests" / "fib_chain" / "target").resolve()
 
@@ -229,9 +229,6 @@ def print_summary(artifacts: PackedArtifacts, proof_blob: bytes, proof_id: bytes
     print("vk_json:", artifacts.vk_json_path)
     print("public inputs bytes:", len(artifacts.public_inputs_bytes))
     print("proof bytes:", len(artifacts.proof_bytes))
-    print("proof fields:", artifacts.proof_fields)
-    print("public input fields:", artifacts.public_input_fields)
-    print("total fields:", artifacts.proof_fields + artifacts.public_input_fields)
     print("proof blob bytes:", len(proof_blob))
     print("proof_id (hex):", proof_id.hex())
     print("proof_id (base64):", base64.b64encode(proof_id).decode("ascii"))

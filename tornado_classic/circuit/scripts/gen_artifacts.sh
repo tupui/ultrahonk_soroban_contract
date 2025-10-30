@@ -7,9 +7,9 @@ export PATH="${SCRIPT_DIR}:${PATH}"
 cd "${PROJECT_ROOT}"
 
 NARGO_BIN="${NARGO:-${HOME}/.nargo/bin/nargo}"
-BB_BIN="${BB:-${HOME}/.bb/bb}"
-REQUIRED_NARGO_VERSION="1.0.0-beta.9"
-REQUIRED_BB_VERSION="v0.87.0"
+BB_BIN="${BB:-${HOME}/.bb/bin/bb}"
+REQUIRED_NARGO_VERSION="1.0.0-beta.13"
+REQUIRED_BB_VERSION="v1.0.0"
 
 PROJECT_NAME="${NAME:-}"
 if [[ -z "${PROJECT_NAME}" ]]; then

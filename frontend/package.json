@@ -1,0 +1,32 @@
+{
+  "name": "proof-gen",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@rollup/plugin-inject": "^5.0.5",
+    "@types/bun": "latest",
+    "@vitejs/plugin-react": "^5.1.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12",
+    "vite-plugin-node-polyfills": "^0.24.0",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.5.0"
+  },
+  "dependencies": {
+    "@aztec/bb.js": "0.87.0",
+    "@noble/hashes": "^2.0.1",
+    "@noir-lang/noir_js": "1.0.0-beta.9",
+    "@noir-lang/noir_wasm": "1.0.0-beta.9",
+    "@stellar/stellar-sdk": "^14.3.0",
+    "buffer": "^6.0.3",
+    "pino": "^10.1.0",
+    "process": "^0.11.10",
+    "ultrahonk-soroban-contract-sdk": "../ultrahonk-soroban-contract-sdk"
+  }
+}
