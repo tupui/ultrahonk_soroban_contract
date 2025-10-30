@@ -50,11 +50,15 @@ export default defineConfig(({ mode }) => ({
       'buffer': 'buffer/',
       'process/browser': path.resolve(__dirname, 'node_modules/process/browser.js'),
       'process': path.resolve(__dirname, 'node_modules/process/browser.js'),
-    }
+    },
+    // Dedupe @stellar/stellar-sdk to prevent multiple versions
+    dedupe: ['@stellar/stellar-sdk']
   },
 
   // Configure dependency optimization
   optimizeDeps: {
+    // Include stellar-sdk to ensure proper resolution during build
+    include: ['@stellar/stellar-sdk', '@stellar/stellar-sdk/contract', '@stellar/stellar-sdk/rpc'],
     exclude: [
       '@noir-lang/noir_wasm',
       '@noir-lang/noirc_abi',

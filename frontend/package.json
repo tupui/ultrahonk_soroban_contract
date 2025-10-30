@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
+    "prebuild": "cd ../ultrahonk-soroban-contract-sdk && npm install && npm run build",
     "build": "vite build",
     "preview": "vite preview"
   },
