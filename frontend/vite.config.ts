@@ -2,20 +2,27 @@ import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import inject from '@rollup/plugin-inject';
+import path from 'path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     wasm(),
     topLevelAwait(),
-    nodePolyfills({
-      // Polyfill Node.js globals and modules for browser
-      include: ['buffer', 'process'],
-      globals: {
-        Buffer: true,
-        global: true,
-        process: true,
-      },
-    }),
+    // Only use nodePolyfills in dev mode for global polyfills
+    // In build mode, we use @rollup/plugin-inject instead to avoid import resolution issues
+    ...(mode === 'development' ? [
+      nodePolyfills({
+        // Only polyfill global variables during dev
+        globals: {
+          Buffer: true,  // Makes Buffer available globally
+          global: true,   // Makes global available as globalThis
+          process: true,  // Makes process available globally
+        },
+        // Disable protocol imports to avoid conflicts
+        protocolImports: false,
+      })
+    ] : []),
     // Custom middleware plugin to redirect WASM requests (following noir-playground)
     {
       name: 'wasm-redirect-middleware',
@@ -35,16 +42,19 @@ export default defineConfig({
     }
   ],
 
-  // Resolve aliases (following noir-playground)
+  // Resolve aliases
   resolve: {
     alias: {
       'pino': 'pino/browser.js',
+      // Ensure buffer and process resolve to the actual npm packages
+      'buffer': 'buffer/',
+      'process/browser': path.resolve(__dirname, 'node_modules/process/browser.js'),
+      'process': path.resolve(__dirname, 'node_modules/process/browser.js'),
     }
   },
 
-  // Configure dependency optimization (following noir-playground exactly)
+  // Configure dependency optimization
   optimizeDeps: {
-    include: ['buffer', 'process'],
     exclude: [
       '@noir-lang/noir_wasm',
       '@noir-lang/noirc_abi',
@@ -55,7 +65,7 @@ export default defineConfig({
     force: true,
   },
 
-  // Worker configuration (following noir-playground)
+  // Worker configuration
   worker: {
     format: 'es',
     plugins: () => [
@@ -81,6 +91,14 @@ export default defineConfig({
   build: {
     target: 'es2022',
     rollupOptions: {
+      // Use @rollup/plugin-inject for build-time module injection
+      // This handles `import { Buffer } from 'buffer'` during production builds
+      plugins: [
+        inject({
+          Buffer: ['buffer', 'Buffer'],
+          process: ['process', 'default'],
+        })
+      ],
       output: {
         manualChunks: {
           noir: ['@noir-lang/noir_js', '@aztec/bb.js']
@@ -89,4 +107,8 @@ export default defineConfig({
     }
   },
 
-});
+  // Define globals for browser compatibility (used in both dev and build)
+  define: {
+    global: 'globalThis',
+  },
+}));
