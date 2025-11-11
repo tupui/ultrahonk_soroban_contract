@@ -22,3 +22,6 @@ target
 
 test_snapshots
 Cargo.lock
+
+.idea
+.vite
