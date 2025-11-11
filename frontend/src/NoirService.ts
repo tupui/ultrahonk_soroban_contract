@@ -97,34 +97,73 @@ export class NoirService {
 
       publicParams.forEach((p: any) => {
         const inputValue = inputs[p.name];
-        console.log(`[DEBUG] Public input ${p.name} = ${inputValue} (0x${inputValue.toString(16)})`);
-
-        // Create 32-byte field element
-        const field = new Uint8Array(32);
-
-        // For integer types, encode as big-endian bytes
-        if (p.type.kind === 'integer') {
-          const width = p.type.width; // 8, 16, 32, 64, etc.
-          const numBytes = width / 8;
-
-          // Convert number to big-endian bytes
-          let value = BigInt(inputValue);
-          for (let i = 0; i < numBytes; i++) {
-            field[32 - 1 - i] = Number(value & BigInt(0xff));
-            value = value >> BigInt(8);
+        
+        // Helper function to encode a single value as a 32-byte field element
+        const encodeField = (value: any, elementType: string, width?: number): Uint8Array => {
+          const field = new Uint8Array(32);
+          const bigIntValue = BigInt(value);
+          
+          if (elementType === 'integer' && width) {
+            // For integer types, encode as big-endian bytes
+            const numBytes = width / 8;
+            let val = bigIntValue;
+            for (let i = 0; i < numBytes; i++) {
+              field[32 - 1 - i] = Number(val & BigInt(0xff));
+              val = val >> BigInt(8);
+            }
+          } else {
+            // For field types or default, encode as full 32-byte big-endian field element
+            let val = bigIntValue;
+            for (let i = 0; i < 32; i++) {
+              field[32 - 1 - i] = Number(val & BigInt(0xff));
+              val = val >> BigInt(8);
+            }
           }
-        } else if (p.type.kind === 'field') {
-          // Field elements are already in the right format
-          // For now, assume small field values fit in a number
-          let value = BigInt(inputValue);
-          for (let i = 0; i < 32; i++) {
-            field[32 - 1 - i] = Number(value & BigInt(0xff));
-            value = value >> BigInt(8);
+          return field;
+        };
+
+        // Handle array types (e.g., puzzle: pub [Field; 81])
+        if (p.type.kind === 'array') {
+          const arrayLength = p.type.length;
+          const elementType = p.type.type.kind;
+          const elementWidth = p.type.type.width; // May be undefined for field types
+          
+          console.log(`[DEBUG] Public input ${p.name} is an array of length ${arrayLength}, element type: ${elementType}`);
+          
+          // Validate array length
+          if (!Array.isArray(inputValue)) {
+            throw new Error(`Expected array for public parameter ${p.name}, got ${typeof inputValue}`);
           }
+          if (inputValue.length !== arrayLength) {
+            throw new Error(`Array length mismatch for ${p.name}: expected ${arrayLength}, got ${inputValue.length}`);
+          }
+          
+          // Encode each array element as a separate 32-byte field element
+          inputValue.forEach((element: any, index: number) => {
+            const field = encodeField(element, elementType, elementWidth);
+            console.log(`[DEBUG] Encoded ${p.name}[${index}] = ${element} as: ${Array.from(field).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16)}...`);
+            publicInputFields.push(field);
+          });
+          
+          console.log(`[DEBUG] Encoded ${p.name} array: ${arrayLength} field elements added`);
+        } 
+        // Handle scalar integer types (e.g., maze_seed: pub u32)
+        else if (p.type.kind === 'integer') {
+          console.log(`[DEBUG] Public input ${p.name} = ${inputValue} (integer)`);
+          const field = encodeField(inputValue, 'integer', p.type.width);
+          console.log(`[DEBUG] Encoded ${p.name} as: ${Array.from(field).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+          publicInputFields.push(field);
+        } 
+        // Handle scalar field types
+        else if (p.type.kind === 'field') {
+          console.log(`[DEBUG] Public input ${p.name} = ${inputValue} (field)`);
+          const field = encodeField(inputValue, 'field');
+          console.log(`[DEBUG] Encoded ${p.name} as: ${Array.from(field).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+          publicInputFields.push(field);
         }
-
-        console.log(`[DEBUG] Encoded ${p.name} as: ${Array.from(field).map(b => b.toString(16).padStart(2, '0')).join('')}`);
-        publicInputFields.push(field);
+        else {
+          throw new Error(`Unsupported public parameter type: ${p.type.kind} for parameter ${p.name}`);
+        }
       });
     }
 
