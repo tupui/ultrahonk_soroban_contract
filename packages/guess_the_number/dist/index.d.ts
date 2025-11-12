@@ -50,6 +50,26 @@ export interface Client {
         simulate?: boolean;
     }) => Promise<AssembledTransaction<null>>;
     /**
+     * Construct and simulate a verify_proof transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     */
+    verify_proof: ({ vk_json, proof_blob }: {
+        vk_json: Buffer;
+        proof_blob: Buffer;
+    }, options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Result<Buffer>>>;
+    /**
      * Construct and simulate a guess transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
      * Guess a number between 1 and 10
      */
@@ -168,6 +188,7 @@ export declare class Client extends ContractClient {
     constructor(options: ContractClientOptions);
     readonly fromJSON: {
         reset: (json: string) => AssembledTransaction<null>;
+        verify_proof: (json: string) => AssembledTransaction<Result<Buffer<ArrayBufferLike>, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
         guess: (json: string) => AssembledTransaction<Result<boolean, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
         add_funds: (json: string) => AssembledTransaction<null>;
         upgrade: (json: string) => AssembledTransaction<null>;

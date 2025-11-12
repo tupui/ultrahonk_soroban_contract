@@ -76,6 +76,26 @@ export interface Client {
   }) => Promise<AssembledTransaction<null>>
 
   /**
+   * Construct and simulate a verify_proof transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  verify_proof: ({vk_json, proof_blob}: {vk_json: Buffer, proof_blob: Buffer}, options?: {
+    /**
+     * The fee to pay for the transaction. Default: BASE_FEE
+     */
+    fee?: number;
+
+    /**
+     * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+     */
+    timeoutInSeconds?: number;
+
+    /**
+     * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+     */
+    simulate?: boolean;
+  }) => Promise<AssembledTransaction<Result<Buffer>>>
+
+  /**
    * Construct and simulate a guess transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Guess a number between 1 and 10
    */
@@ -203,6 +223,7 @@ export class Client extends ContractClient {
       new ContractSpec([ "AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAAwAAADJUaGUgY29udHJhY3QgZmFpbGVkIHRvIHRyYW5zZmVyIFhMTSB0byB0aGUgZ3Vlc3NlcgAAAAAAGUZhaWxlZFRvVHJhbnNmZXJUb0d1ZXNzZXIAAAAAAAABAAAAMlRoZSBndWVzc2VyIGZhaWxlZCB0byB0cmFuc2ZlciBYTE0gdG8gdGhlIGNvbnRyYWN0AAAAAAAbRmFpbGVkVG9UcmFuc2ZlckZyb21HdWVzc2VyAAAAAAIAAAA2VGhlIGNvbnRyYWN0IGhhcyBubyBiYWxhbmNlIHRvIHRyYW5zZmVyIHRvIHRoZSBndWVzc2VyAAAAAAATTm9CYWxhbmNlVG9UcmFuc2ZlcgAAAAAD",
         "AAAAAAAAAEhDb25zdHJ1Y3RvciB0byBpbml0aWFsaXplIHRoZSBjb250cmFjdCB3aXRoIGFuIGFkbWluIGFuZCBhIHJhbmRvbSBudW1iZXIAAAANX19jb25zdHJ1Y3RvcgAAAAAAAAEAAAAAAAAABWFkbWluAAAAAAAAEwAAAAA=",
         "AAAAAAAAACpVcGRhdGUgdGhlIG51bWJlci4gT25seSBjYWxsYWJsZSBieSBhZG1pbi4AAAAAAAVyZXNldAAAAAAAAAAAAAAA",
+        "AAAAAAAAAAAAAAAMdmVyaWZ5X3Byb29mAAAAAgAAAAAAAAAHdmtfanNvbgAAAAAOAAAAAAAAAApwcm9vZl9ibG9iAAAAAAAOAAAAAQAAA+kAAAPuAAAAIAAAAAM=",
         "AAAAAAAAAB9HdWVzcyBhIG51bWJlciBiZXR3ZWVuIDEgYW5kIDEwAAAAAAVndWVzcwAAAAAAAAIAAAAAAAAACGFfbnVtYmVyAAAABgAAAAAAAAAHZ3Vlc3NlcgAAAAATAAAAAQAAA+kAAAABAAAAAw==",
         "AAAAAAAAAChBZG1pbiBjYW4gYWRkIG1vcmUgZnVuZHMgdG8gdGhlIGNvbnRyYWN0AAAACWFkZF9mdW5kcwAAAAAAAAEAAAAAAAAABmFtb3VudAAAAAAACwAAAAA=",
         "AAAAAAAAADlVcGdyYWRlIHRoZSBjb250cmFjdCB0byBuZXcgd2FzbS4gT25seSBjYWxsYWJsZSBieSBhZG1pbi4AAAAAAAAHdXBncmFkZQAAAAABAAAAAAAAAA1uZXdfd2FzbV9oYXNoAAAAAAAD7gAAACAAAAAA",
@@ -213,6 +234,7 @@ export class Client extends ContractClient {
   }
   public readonly fromJSON = {
     reset: this.txFromJSON<null>,
+        verify_proof: this.txFromJSON<Result<Buffer>>,
         guess: this.txFromJSON<Result<boolean>>,
         add_funds: this.txFromJSON<null>,
         upgrade: this.txFromJSON<null>,

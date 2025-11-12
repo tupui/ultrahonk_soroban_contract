@@ -1,5 +1,10 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Bytes, BytesN, Env, Symbol};
+
+
+mod ultrahonk_contract {
+    soroban_sdk::contractimport!(file = "ultrahonk_soroban_contract.wasm");
+}
 
 mod error;
 mod xlm;
@@ -11,6 +16,9 @@ pub struct GuessTheNumber;
 
 const THE_NUMBER: &Symbol = &symbol_short!("n");
 pub const ADMIN_KEY: &Symbol = &symbol_short!("ADMIN");
+
+pub const ULTRAHONK_CONTRACT_ADDRESS: &str = "CA6UBZSOZ7OHUZ5JSRUBWGCGYYKEEIPPAYGWLXWMWMGPL5UHDF5724TO";
+
 
 #[contractimpl]
 impl GuessTheNumber {
@@ -43,6 +51,12 @@ impl GuessTheNumber {
     fn reset_number(env: &Env) {
         let new_number: u64 = env.prng().gen_range(1..=10);
         env.storage().instance().set(THE_NUMBER, &new_number);
+    }
+
+    pub fn verify_proof(env: Env, vk_json: Bytes, proof_blob: Bytes) -> Result<BytesN<32>, Error> {
+        let ultrahonk_contract_address = Address::from_str(&env, ULTRAHONK_CONTRACT_ADDRESS);
+        let ultrahonk_client = ultrahonk_contract::Client::new(&env, &ultrahonk_contract_address);
+        Ok(ultrahonk_client.verify_proof(&vk_json, &proof_blob))
     }
 
     /// Guess a number between 1 and 10
