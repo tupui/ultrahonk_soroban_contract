@@ -102,7 +102,7 @@ This repository bridges them by:
 
 ## Key Components Explained
 
-### 1. The Verifier Contract ([src/lib.rs](src/lib.rs))
+### 1. The Verifier Contract ([src/lib.rs](contracts/ultrahonk-soroban-contract/src/lib.rs))
 
 This is the heart of the system—a Soroban smart contract that verifies UltraHonk proofs.
 
@@ -139,7 +139,7 @@ The contract expects proofs in a specific packed format:
 [32*P bytes: proof data (P=440 or P=456 fields)]
 ```
 
-The script [scripts/invoke_ultrahonk.py](scripts/invoke_ultrahonk.py) handles this packing automatically.
+The script [scripts/invoke_ultrahonk.py](contracts/ultrahonk-soroban-contract/scripts/invoke_ultrahonk.py) handles this packing automatically.
 
 #### Why Manual JSON Parsing?
 
@@ -200,7 +200,7 @@ pub fn main(a0: Field, a1: Field, out: pub Field) {
 
 ---
 
-### 3. Tornado Cash-Style Mixer ([tornado_classic/](tornado_classic/))
+### 3. Tornado Cash-Style Mixer ([tornado_classic/](contracts/ultrahonk-soroban-contract/tornado_classic/))
 
 This is a **real-world application** demonstrating privacy-preserving withdrawals.
 
@@ -238,7 +238,7 @@ The deposit and withdrawal are **unlinkable**:
 - Anyone can see withdrawals coming out
 - **But no one can link which deposit corresponds to which withdrawal** (assuming enough deposits exist for anonymity set)
 
-#### Circuit ([tornado_classic/circuit/src/main.nr](tornado_classic/circuit/src/main.nr))
+#### Circuit ([tornado_classic/circuit/src/main.nr](contracts/ultrahonk-soroban-contract/tornado_classic/circuit/src/main.nr))
 
 ```noir
 pub fn main(
@@ -450,7 +450,7 @@ impl MyApp {
 }
 ```
 
-See [tornado_classic/contracts/src/mixer.rs:187-192](tornado_classic/contracts/src/mixer.rs#L187-L192) for a real example.
+See [tornado_classic/contracts/src/mixer.rs:187-192](contracts/ultrahonk-soroban-contract/tornado_classic/contracts/src/mixer.rs#L187-L192) for a real example.
 
 ---
 
@@ -505,7 +505,7 @@ If you exceed 128 KiB, use `stellar contract optimize` (wraps wasm-opt).
 
 ### The Keccak256 Hash in Python Script
 
-The [invoke_ultrahonk.py](scripts/invoke_ultrahonk.py#L112-L146) script includes a **minimal Keccak-256 implementation** with no external dependencies (lines 37-146):
+The [invoke_ultrahonk.py](contracts/ultrahonk-soroban-contract/scripts/invoke_ultrahonk.py#L112-L146) script includes a **minimal Keccak-256 implementation** with no external dependencies (lines 37-146):
 
 ```python
 def keccak256(data: bytes) -> bytes:
@@ -725,15 +725,15 @@ The future of privacy and scalability on Stellar starts here. 🚀
 
 | File | Purpose |
 |------|---------|
-| [src/lib.rs](src/lib.rs) | Main verifier contract implementation |
-| [scripts/invoke_ultrahonk.py](scripts/invoke_ultrahonk.py) | Helper script for proof packing and invocation |
+| [src/lib.rs](contracts/ultrahonk-soroban-contract/src/lib.rs) | Main verifier contract implementation |
+| [scripts/invoke_ultrahonk.py](contracts/ultrahonk-soroban-contract/scripts/invoke_ultrahonk.py) | Helper script for proof packing and invocation |
 | [tests/integration_tests.rs](tests/integration_tests.rs) | Integration tests for verifier |
 | [tests/simple_circuit/](tests/simple_circuit/) | Example: simple inequality circuit |
 | [tests/fib_chain/](tests/fib_chain/) | Example: Fibonacci computation |
-| [tornado_classic/](tornado_classic/) | Example: privacy mixer application |
-| [tornado_classic/circuit/src/main.nr](tornado_classic/circuit/src/main.nr) | Mixer circuit (Merkle proof) |
-| [tornado_classic/contracts/src/mixer.rs](tornado_classic/contracts/src/mixer.rs) | Mixer contract implementation |
-| [tornado_classic/contracts/src/hash2.rs](tornado_classic/contracts/src/hash2.rs) | Poseidon2 hash implementation |
+| [tornado_classic/](contracts/ultrahonk-soroban-contract/tornado_classic/) | Example: privacy mixer application |
+| [tornado_classic/circuit/src/main.nr](contracts/ultrahonk-soroban-contract/tornado_classic/circuit/src/main.nr) | Mixer circuit (Merkle proof) |
+| [tornado_classic/contracts/src/mixer.rs](contracts/ultrahonk-soroban-contract/tornado_classic/contracts/src/mixer.rs) | Mixer contract implementation |
+| [tornado_classic/contracts/src/hash2.rs](contracts/ultrahonk-soroban-contract/tornado_classic/contracts/src/hash2.rs) | Poseidon2 hash implementation |
 
 ---
 
