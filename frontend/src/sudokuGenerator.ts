@@ -52,7 +52,9 @@ function solveSudoku(grid: number[]): boolean {
       const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
       for (let j = numbers.length - 1; j > 0; j--) {
         const k = Math.floor(Math.random() * (j + 1));
-        [numbers[j], numbers[k]] = [numbers[k], numbers[j]];
+        const temp = numbers[j]!;
+        numbers[j] = numbers[k]!;
+        numbers[k] = temp;
       }
 
       for (const num of numbers) {
@@ -81,7 +83,9 @@ function generateSolution(): number[] {
     const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
     for (let j = numbers.length - 1; j > 0; j--) {
       const k = Math.floor(Math.random() * (j + 1));
-      [numbers[j], numbers[k]] = [numbers[k], numbers[j]];
+      const temp = numbers[j]!;
+      numbers[j] = numbers[k]!;
+      numbers[k] = temp;
     }
 
     let idx = 0;
@@ -110,7 +114,9 @@ function generatePuzzle(solution: number[], difficulty: number = 30): number[] {
   // Shuffle indices randomly
   for (let i = indices.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
+    const temp = indices[i]!;
+    indices[i] = indices[j]!;
+    indices[j] = temp;
   }
 
   // Remove cells to reach target difficulty
@@ -122,8 +128,11 @@ function generatePuzzle(solution: number[], difficulty: number = 30): number[] {
   // Remove cells strategically to maintain some symmetry
   let removed = 0;
   for (let i = 0; i < indices.length && removed < cellsToRemove; i++) {
-    puzzle[indices[i]] = 0;
-    removed++;
+    const idx = indices[i];
+    if (idx !== undefined) {
+      puzzle[idx] = 0;
+      removed++;
+    }
   }
 
   return puzzle;

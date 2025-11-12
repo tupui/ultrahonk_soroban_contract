@@ -11,6 +11,7 @@
  */
 
 import { NoirService } from './NoirService';
+import { generateRandomSudoku } from './sudokuGenerator';
 
 const noirService = new NoirService();
 
@@ -52,6 +53,17 @@ const outputDiv = document.getElementById('output') as HTMLDivElement;
 let currentCircuitParams: any[] = [];
 
 // ============================================================================
+// Sudoku Grid State
+// ============================================================================
+
+/** Sudoku grid cells (only used when circuit is "sudoku") */
+let sudokuGridCells: HTMLInputElement[] = [];
+/** Set of indices that are given/locked in the puzzle */
+let sudokuGivenIndices = new Set<number>();
+/** Current difficulty setting (number of givens) */
+let sudokuDifficulty = 30;
+
+// ============================================================================
 // Circuit Input Form Management
 // ============================================================================
 
@@ -62,11 +74,19 @@ let currentCircuitParams: any[] = [];
  * - Fetches circuit ABI from the circuit JSON file
  * - Clears existing input fields
  * - Creates appropriate input controls (text inputs for scalars, textareas for arrays)
+ * - For Sudoku circuit: creates interactive grid UI
  * - Populates fields with default values from CIRCUIT_DEFAULTS
  */
 async function loadCircuitInputs() {
   const circuitName = circuitSelect.value;
 
+  // Special handling for Sudoku circuit
+  if (circuitName === 'sudoku') {
+    await loadSudokuUI();
+    return;
+  }
+
+  // Standard handling for all other circuits
   try {
     const metadata = await noirService.getCircuitMetadata(circuitName);
 
@@ -119,6 +139,416 @@ async function loadCircuitInputs() {
 }
 
 // ============================================================================
+// Sudoku UI Functions
+// ============================================================================
+
+/**
+ * Loads the Sudoku UI with grid and control buttons
+ */
+async function loadSudokuUI() {
+  try {
+    // Get circuit metadata (still needed for parameter info)
+    const metadata = await noirService.getCircuitMetadata('sudoku');
+    currentCircuitParams = metadata.parameters;
+
+    // Clear existing inputs
+    inputsDiv.innerHTML = '';
+
+    // Create difficulty slider container
+    const difficultyContainer = document.createElement('div');
+    difficultyContainer.className = 'sudoku-difficulty';
+    
+    const difficultyLabel = document.createElement('label');
+    difficultyLabel.textContent = 'Pre-filled numbers: ';
+    difficultyLabel.setAttribute('for', 'difficulty-slider');
+    
+    const difficultySlider = document.createElement('input');
+    difficultySlider.type = 'range';
+    difficultySlider.id = 'difficulty-slider';
+    difficultySlider.min = '17';
+    difficultySlider.max = '60';
+    difficultySlider.value = sudokuDifficulty.toString();
+    difficultySlider.step = '1';
+    
+    const difficultyValue = document.createElement('span');
+    difficultyValue.id = 'difficulty-value';
+    difficultyValue.textContent = sudokuDifficulty.toString();
+    difficultyValue.className = 'difficulty-value';
+    
+    difficultySlider.addEventListener('input', (e) => {
+      const value = parseInt((e.target as HTMLInputElement).value);
+      sudokuDifficulty = value;
+      difficultyValue.textContent = value.toString();
+      // Automatically generate a new grid when slider is adjusted
+      generateRandomGame();
+    });
+    
+    difficultyContainer.appendChild(difficultyLabel);
+    difficultyContainer.appendChild(difficultySlider);
+    difficultyContainer.appendChild(difficultyValue);
+
+    // Create control buttons container
+    const controlsDiv = document.createElement('div');
+    controlsDiv.className = 'sudoku-controls';
+
+    const generateRandomBtn = document.createElement('button');
+    generateRandomBtn.id = 'generate-random';
+    generateRandomBtn.textContent = 'Generate Random';
+    generateRandomBtn.addEventListener('click', generateRandomGame);
+
+    const loadExampleBtn = document.createElement('button');
+    loadExampleBtn.id = 'load-example';
+    loadExampleBtn.textContent = 'Load Example';
+    loadExampleBtn.addEventListener('click', loadExample);
+
+    const resetPuzzleBtn = document.createElement('button');
+    resetPuzzleBtn.id = 'reset-puzzle';
+    resetPuzzleBtn.textContent = 'Reset Puzzle';
+    resetPuzzleBtn.addEventListener('click', resetPuzzle);
+
+    const validateGridBtn = document.createElement('button');
+    validateGridBtn.id = 'validate-grid';
+    validateGridBtn.textContent = 'Validate Grid';
+    validateGridBtn.addEventListener('click', validateSudokuGrid);
+
+    controlsDiv.appendChild(generateRandomBtn);
+    controlsDiv.appendChild(loadExampleBtn);
+    controlsDiv.appendChild(resetPuzzleBtn);
+    controlsDiv.appendChild(validateGridBtn);
+
+    // Create container for grid
+    const containerDiv = document.createElement('div');
+    containerDiv.className = 'sudoku-container';
+
+    const gridDiv = document.createElement('div');
+    gridDiv.id = 'sudoku-grid';
+
+    containerDiv.appendChild(gridDiv);
+
+    inputsDiv.appendChild(difficultyContainer);
+    inputsDiv.appendChild(controlsDiv);
+    inputsDiv.appendChild(containerDiv);
+
+    // Initialize the grid
+    initSudokuGrid();
+
+    // Load example by default
+    loadExample();
+  } catch (error) {
+    console.error('Error loading Sudoku UI:', error);
+    outputDiv.textContent = `Error: ${error}`;
+  }
+}
+
+/**
+ * Initializes the Sudoku grid with 81 input cells
+ */
+function initSudokuGrid() {
+  const sudokuGrid = document.getElementById('sudoku-grid') as HTMLDivElement;
+  if (!sudokuGrid) return;
+
+  sudokuGrid.innerHTML = '';
+  sudokuGridCells.length = 0;
+  sudokuGivenIndices.clear();
+
+  for (let i = 0; i < 81; i++) {
+    const cell = document.createElement('input');
+    cell.type = 'text';
+    cell.className = 'sudoku-cell';
+    cell.maxLength = 1;
+    cell.value = '';
+    
+    cell.addEventListener('input', (e) => {
+      const input = e.target as HTMLInputElement;
+      const index = sudokuGridCells.indexOf(input);
+      
+      if (sudokuGivenIndices.has(index)) {
+        input.value = '';
+        return;
+      }
+      
+      // Only allow digits 1-9
+      input.value = input.value.replace(/[^1-9]/g, '');
+      if (input.value.length > 1) {
+        input.value = input.value.slice(-1);
+      }
+    });
+
+    cell.addEventListener('keydown', (e) => {
+      const index = sudokuGridCells.indexOf(e.target as HTMLInputElement);
+      
+      if (sudokuGivenIndices.has(index) && (e.key === 'Backspace' || e.key === 'Delete')) {
+        e.preventDefault();
+        return;
+      }
+      
+      let newIndex = index;
+
+      switch (e.key) {
+        case 'ArrowUp':
+          newIndex = index - 9;
+          e.preventDefault();
+          break;
+        case 'ArrowDown':
+          newIndex = index + 9;
+          e.preventDefault();
+          break;
+        case 'ArrowLeft':
+          newIndex = index - 1;
+          e.preventDefault();
+          break;
+        case 'ArrowRight':
+          newIndex = index + 1;
+          e.preventDefault();
+          break;
+      }
+
+      if (newIndex >= 0 && newIndex < 81) {
+        sudokuGridCells[newIndex]?.focus();
+      }
+    });
+
+    sudokuGridCells.push(cell);
+    sudokuGrid.appendChild(cell);
+  }
+}
+
+/**
+ * Sets given cells from a puzzle array (marks them as locked)
+ */
+function setGivenCells(puzzle: number[]) {
+  sudokuGivenIndices.clear();
+  
+  puzzle.forEach((value, index) => {
+    if (value > 0) {
+      sudokuGivenIndices.add(index);
+      const cell = sudokuGridCells[index];
+      if (cell) {
+        cell.value = value.toString();
+        cell.classList.add('locked');
+        cell.readOnly = true;
+      }
+    }
+  });
+}
+
+/**
+ * Validates the Sudoku grid (only when grid is completely filled)
+ */
+function validateSudokuGrid() {
+  // Clear previous validation
+  sudokuGridCells.forEach((cell) => {
+    cell.classList.remove('error', 'valid');
+  });
+
+  const values = sudokuGridCells.map((cell) => parseInt(cell.value) || 0);
+
+  // Check if grid is full
+  const emptyCells = values.filter(v => v === 0).length;
+  if (emptyCells > 0) {
+    outputDiv.textContent = `Grid is not complete! ${emptyCells} empty cells remaining. Please fill all cells before validating.`;
+    return;
+  }
+
+  let hasErrors = false;
+  const errorIndices = new Set<number>();
+
+  // Check rows
+  for (let row = 0; row < 9; row++) {
+    const rowValues: Map<number, number[]> = new Map();
+    for (let col = 0; col < 9; col++) {
+      const index = row * 9 + col;
+      const value = values[index];
+      if (value !== undefined && value > 0) {
+        if (!rowValues.has(value)) {
+          rowValues.set(value, []);
+        }
+        const indices = rowValues.get(value);
+        if (indices) {
+          indices.push(index);
+        }
+      }
+    }
+    rowValues.forEach((indices) => {
+      if (indices.length > 1) {
+        indices.forEach((idx) => errorIndices.add(idx));
+        hasErrors = true;
+      }
+    });
+  }
+
+  // Check columns
+  for (let col = 0; col < 9; col++) {
+    const colValues: Map<number, number[]> = new Map();
+    for (let row = 0; row < 9; row++) {
+      const index = row * 9 + col;
+      const value = values[index];
+      if (value !== undefined && value > 0) {
+        if (!colValues.has(value)) {
+          colValues.set(value, []);
+        }
+        const indices = colValues.get(value);
+        if (indices) {
+          indices.push(index);
+        }
+      }
+    }
+    colValues.forEach((indices) => {
+      if (indices.length > 1) {
+        indices.forEach((idx) => errorIndices.add(idx));
+        hasErrors = true;
+      }
+    });
+  }
+
+  // Check 3x3 boxes
+  for (let boxRow = 0; boxRow < 3; boxRow++) {
+    for (let boxCol = 0; boxCol < 3; boxCol++) {
+      const boxValues: Map<number, number[]> = new Map();
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          const row = boxRow * 3 + i;
+          const col = boxCol * 3 + j;
+          const index = row * 9 + col;
+          const value = values[index];
+          if (value !== undefined && value > 0) {
+            if (!boxValues.has(value)) {
+              boxValues.set(value, []);
+            }
+            const indices = boxValues.get(value);
+            if (indices) {
+              indices.push(index);
+            }
+          }
+        }
+      }
+      boxValues.forEach((indices) => {
+        if (indices.length > 1) {
+          indices.forEach((idx) => errorIndices.add(idx));
+          hasErrors = true;
+        }
+      });
+    }
+  }
+
+  // Apply visual feedback
+  errorIndices.forEach((idx) => {
+    const cell = sudokuGridCells[idx];
+    if (cell) {
+      cell.classList.add('error');
+    }
+  });
+
+  if (!hasErrors) {
+    sudokuGridCells.forEach((cell, idx) => {
+      const value = values[idx];
+      if (value !== undefined && value > 0 && cell) {
+        cell.classList.add('valid');
+      }
+    });
+    outputDiv.textContent = '✓ Validation passed! No duplicates found.';
+  } else {
+    outputDiv.textContent = '❌ Validation failed: Found duplicates in rows, columns, or 3x3 boxes.';
+  }
+}
+
+/**
+ * Collects puzzle and solution data from the grid
+ */
+function collectSudokuGridData(): { puzzle: number[], solution: number[] } {
+  const solution = sudokuGridCells.map((cell) => {
+    const value = parseInt(cell.value) || 0;
+    return value;
+  });
+
+  const puzzle = sudokuGridCells.map((cell, index) => {
+    if (sudokuGivenIndices.has(index)) {
+      return parseInt(cell.value) || 0;
+    }
+    return 0;
+  });
+
+  return { puzzle, solution };
+}
+
+/**
+ * Generates a random Sudoku game
+ */
+function generateRandomGame() {
+  clearSudokuGrid();
+  
+  outputDiv.textContent = 'Generating random Sudoku...';
+  
+  // Generate a random puzzle with the current difficulty setting
+  const { puzzle, solution } = generateRandomSudoku(sudokuDifficulty);
+  
+  setGivenCells(puzzle);
+  
+  outputDiv.textContent = `✓ Random game generated with ${puzzle.filter(v => v > 0).length} givens. Fill in the empty cells to complete the puzzle.`;
+}
+
+/**
+ * Loads the example puzzle from CIRCUIT_DEFAULTS
+ */
+function loadExample() {
+  clearSudokuGrid();
+  
+  const defaults = CIRCUIT_DEFAULTS['sudoku'] || {};
+  const puzzleStr = defaults.puzzle || '';
+  const solutionStr = defaults.solution || '';
+
+  try {
+    const puzzle = JSON.parse(puzzleStr);
+    const solution = JSON.parse(solutionStr);
+    
+    setGivenCells(puzzle);
+    
+    // Fill in the complete solution (given cells are already set and locked)
+    solution.forEach((value: number, index: number) => {
+      const cell = sudokuGridCells[index];
+      if (cell) {
+        cell.value = value.toString();
+      }
+    });
+    
+    outputDiv.textContent = '✓ Example sudoku loaded. Base grid numbers are locked.';
+  } catch (error) {
+    console.error('Error loading example:', error);
+    outputDiv.textContent = 'Error loading example puzzle.';
+  }
+}
+
+/**
+ * Resets the puzzle to its initial state (keeps pre-filled numbers, clears user entries)
+ */
+function resetPuzzle() {
+  sudokuGridCells.forEach((cell, index) => {
+    // Only clear cells that are not locked (user-filled cells)
+    if (!sudokuGivenIndices.has(index)) {
+      cell.value = '';
+      cell.classList.remove('error', 'valid');
+    } else {
+      // Remove validation styling from locked cells too
+      cell.classList.remove('error', 'valid');
+    }
+  });
+  outputDiv.textContent = '';
+}
+
+/**
+ * Clears the entire Sudoku grid (used internally)
+ */
+function clearSudokuGrid() {
+  sudokuGridCells.forEach((cell, index) => {
+    cell.value = '';
+    cell.classList.remove('locked', 'error', 'valid');
+    cell.readOnly = false;
+  });
+  sudokuGivenIndices.clear();
+  outputDiv.textContent = '';
+}
+
+// ============================================================================
 // Proof Generation
 // ============================================================================
 
@@ -126,7 +556,7 @@ async function loadCircuitInputs() {
  * Generates a proof for the selected circuit with user-provided inputs
  *
  * This function:
- * 1. Collects and validates inputs from the form
+ * 1. Collects and validates inputs from the form (or Sudoku grid for sudoku circuit)
  * 2. Converts string inputs to appropriate types (integers, arrays, etc.)
  * 3. Calls NoirService to generate the proof
  * 4. Submits the proof to Stellar for on-chain verification
@@ -137,37 +567,61 @@ async function generateProof() {
 
   // Collect inputs
   const inputs: Record<string,any> = {};
-  const inputElements = inputsDiv.querySelectorAll('input,textarea');
 
-  inputElements.forEach((element: any) => {
-    const value = element.value.trim();
-    const name = element.id;
+  // Special handling for Sudoku circuit
+  if (circuitName === 'sudoku') {
+    const { puzzle, solution } = collectSudokuGridData();
 
-    // Find the parameter metadata for this input
-    const paramMeta = currentCircuitParams.find((p: any) => p.name === name);
-
-    if (element.tagName === 'TEXTAREA') {
-      // Parse array input
-      try {
-        if (value.startsWith('[')) {
-          inputs[name] = JSON.parse(value);
-        } else {
-          // Assume comma-separated values
-          inputs[name] = value.split(',').map((v: string) => v.trim());
-        }
-      } catch (error) {
-        alert(`Invalid array format for ${name}`);
-        throw error;
-      }
-    } else {
-      // Check if this is an integer type
-      if (paramMeta && paramMeta.type === 'integer') {
-        inputs[name] = parseInt(value,10);
-      } else {
-        inputs[name] = value;
-      }
+    // Validate that solution is complete
+    const emptyCells = solution.filter((v) => v === 0).length;
+    if (emptyCells > 0) {
+      alert(`Solution is incomplete! ${emptyCells} empty cells remaining.`);
+      return;
     }
-  });
+
+    // Validate that all values are 1-9
+    const invalidSolution = solution.some((v) => v < 1 || v > 9);
+    if (invalidSolution) {
+      alert('Solution contains invalid values! All cells must be 1-9.');
+      return;
+    }
+
+    inputs.puzzle = puzzle;
+    inputs.solution = solution;
+  } else {
+    // Standard handling for all other circuits
+    const inputElements = inputsDiv.querySelectorAll('input,textarea');
+
+    inputElements.forEach((element: any) => {
+      const value = element.value.trim();
+      const name = element.id;
+
+      // Find the parameter metadata for this input
+      const paramMeta = currentCircuitParams.find((p: any) => p.name === name);
+
+      if (element.tagName === 'TEXTAREA') {
+        // Parse array input
+        try {
+          if (value.startsWith('[')) {
+            inputs[name] = JSON.parse(value);
+          } else {
+            // Assume comma-separated values
+            inputs[name] = value.split(',').map((v: string) => v.trim());
+          }
+        } catch (error) {
+          alert(`Invalid array format for ${name}`);
+          throw error;
+        }
+      } else {
+        // Check if this is an integer type
+        if (paramMeta && paramMeta.type === 'integer') {
+          inputs[name] = parseInt(value,10);
+        } else {
+          inputs[name] = value;
+        }
+      }
+    });
+  }
 
   generateBtn.disabled = true;
   generateBtn.textContent = 'Generating...';
