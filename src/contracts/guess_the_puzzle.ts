@@ -1,9 +1,9 @@
-import * as Client from 'guess_the_number';
+import * as Client from 'guess_the_puzzle';
 import { rpcUrl } from './util';
 
 export default new Client.Client({
   networkPassphrase: 'Standalone Network ; February 2017',
-  contractId: 'CAW6JTAFL5LA5BBO4GIMPMSTYHFVMPAEKKT7NFYXLTNJ525FP4IYFK6W',
+  contractId: 'CBXWA6DTDZTSOQ4LSUDW4XFUJSZK5MA5T5HEI5GD5ZJGW2OBEHTS4J4W',
   rpcUrl,
   allowHttp: true,
   publicKey: undefined,

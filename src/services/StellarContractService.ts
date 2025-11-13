@@ -6,7 +6,7 @@
  */
 
 import { Buffer } from 'buffer';
-import game from '../contracts/guess_the_number';
+import game from '../contracts/guess_the_puzzle';
 
 /**
  * Result of a proof verification transaction on Stellar
@@ -36,7 +36,7 @@ export class StellarContractService {
    * Submits an UltraHonk proof to Stellar for on-chain verification
    *
    * This method:
-   * 1. Calls the verify_proof contract method with the VK and proof blob
+   * 1. Calls the verify_puzzle contract method with the guesser, VK and proof blob
    * 2. Extracts CPU instructions from the simulation data
    * 3. Signs and submits the transaction using wallet
    * 4. Extracts the fee from the transaction result
@@ -57,7 +57,7 @@ export class StellarContractService {
     address: string
   ): Promise<VerificationResult> {
     try {
-      console.log('[StellarContractService] Calling verify_proof...');
+      console.log('[StellarContractService] Calling verify_puzzle...');
       console.log(`[StellarContractService] VK size: ${vkJson.length} bytes`);
       console.log(`[StellarContractService] Proof blob size: ${proofBlob.length} bytes`);
 
@@ -72,8 +72,9 @@ export class StellarContractService {
       // Update contract client with current address
       game.options.publicKey = address;
 
-      // Call verify_proof
-      const tx = await game.verify_proof({
+      // Call verify_puzzle with guesser parameter
+      const tx = await game.verify_puzzle({
+        guesser: address,
         vk_json: vkBuffer,
         proof_blob: proofBuffer,
       });
@@ -110,7 +111,7 @@ export class StellarContractService {
         console.log('[StellarContractService] Fee charged:', fee, 'stroops');
       }
 
-      console.log('[StellarContractService] verify_proof succeeded');
+      console.log('[StellarContractService] verify_puzzle succeeded');
       if (cpuInstructions) {
         console.log(`[StellarContractService] CPU Instructions: ${cpuInstructions.toLocaleString()}`);
       }
@@ -121,7 +122,7 @@ export class StellarContractService {
       }
 
       // Check if verification was successful from transaction result
-      const isVerified = txResponse && txResponse.status === 'SUCCESS';
+      const isVerified = !!(txResponse && txResponse.status === 'SUCCESS');
 
       return {
         success: true,

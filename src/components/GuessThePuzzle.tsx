@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Button, Code, Input, Text } from "@stellar/design-system";
 import { useWallet } from "../hooks/useWallet";
-import game from "../contracts/guess_the_number";
+import game from "../contracts/guess_the_puzzle";
 import { Box } from "../components/layout/Box";
 
-export const GuessTheNumber = () => {
+export const GuessThePuzzle = () => {
   const [guessedIt, setGuessedIt] = useState<boolean>();
   const [theGuess, setTheGuess] = useState<number>();
   const { address } = useWallet();
@@ -76,3 +76,4 @@ export const GuessTheNumber = () => {
     </form>
   );
 };
+

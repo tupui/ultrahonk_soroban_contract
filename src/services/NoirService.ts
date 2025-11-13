@@ -73,13 +73,56 @@ export class NoirService {
     // Extract proof bytes
     const proofBytes = proof.proof;
 
-    // Build public inputs from circuit inputs (don't use bb.js compact format - it strips leading zeros)
-    // Each public parameter becomes a 32-byte big-endian field element
+    // Build public inputs from circuit inputs using helper method
+    const publicInputsBytes = this.encodePublicInputs(circuit, inputs);
+    console.log(`[DEBUG] Total public inputs: ${publicInputsBytes.length} bytes (${publicInputsBytes.length / 32} fields)`);
+
+    // Build proof blob using helper method
+    const { proofBlob, proofId } = this.buildProofBlob(publicInputsBytes, proofBytes);
+
+    // Load pre-generated VK using helper method
+    console.log(`[6/6] Loading verification key...`);
+    const vkJson = await this.loadVk(circuitName);
+
+    console.log(`[6/6] Complete! Proof ID: ${proofId}`);
+
+    return {
+      proof: proofBytes,
+      publicInputs: publicInputsBytes,
+      proofBlob,
+      vkJson,
+      proofId,
+      proofTime
+    };
+  }
+
+  /**
+   * Loads the verification key for a circuit
+   *
+   * @param circuitName - Name of the circuit
+   * @returns Verification key as raw bytes
+   */
+  async loadVk(circuitName: string): Promise<Uint8Array> {
+    const vkResponse = await fetch(`/circuits/${circuitName}_vk.json`);
+    if (!vkResponse.ok) {
+      throw new Error(`Failed to load VK for circuit: ${circuitName}`);
+    }
+    const vkArrayBuffer = await vkResponse.arrayBuffer();
+    return new Uint8Array(vkArrayBuffer);
+  }
+
+  /**
+   * Encodes public inputs from circuit inputs based on circuit ABI
+   *
+   * @param circuit - The compiled circuit JSON
+   * @param inputs - Circuit input values as key-value pairs
+   * @returns Encoded public inputs as bytes
+   */
+  encodePublicInputs(circuit: any, inputs: Record<string, any>): Uint8Array {
+    const publicParams = circuit.abi.parameters.filter((p: any) => p.visibility === 'public');
     const publicInputFields: Uint8Array[] = [];
 
     if (publicParams.length > 0) {
-      console.log(`[DEBUG] Building ${publicParams.length} public input(s) from circuit parameters`);
-
       publicParams.forEach((p: any) => {
         const inputValue = inputs[p.name];
         
@@ -89,7 +132,6 @@ export class NoirService {
           const bigIntValue = BigInt(value);
           
           if (elementType === 'integer' && width) {
-            // For integer types, encode as big-endian bytes
             const numBytes = width / 8;
             let val = bigIntValue;
             for (let i = 0; i < numBytes; i++) {
@@ -97,7 +139,6 @@ export class NoirService {
               val = val >> BigInt(8);
             }
           } else {
-            // For field types or default, encode as full 32-byte big-endian field element
             let val = bigIntValue;
             for (let i = 0; i < 32; i++) {
               field[32 - 1 - i] = Number(val & BigInt(0xff));
@@ -111,11 +152,8 @@ export class NoirService {
         if (p.type.kind === 'array') {
           const arrayLength = p.type.length;
           const elementType = p.type.type.kind;
-          const elementWidth = p.type.type.width; // May be undefined for field types
+          const elementWidth = p.type.type.width;
           
-          console.log(`[DEBUG] Public input ${p.name} is an array of length ${arrayLength}, element type: ${elementType}`);
-          
-          // Validate array length
           if (!Array.isArray(inputValue)) {
             throw new Error(`Expected array for public parameter ${p.name}, got ${typeof inputValue}`);
           }
@@ -123,27 +161,19 @@ export class NoirService {
             throw new Error(`Array length mismatch for ${p.name}: expected ${arrayLength}, got ${inputValue.length}`);
           }
           
-          // Encode each array element as a separate 32-byte field element
-          inputValue.forEach((element: any, index: number) => {
+          inputValue.forEach((element: any) => {
             const field = encodeField(element, elementType, elementWidth);
-            console.log(`[DEBUG] Encoded ${p.name}[${index}] = ${element} as: ${Array.from(field).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16)}...`);
             publicInputFields.push(field);
           });
-          
-          console.log(`[DEBUG] Encoded ${p.name} array: ${arrayLength} field elements added`);
         } 
-        // Handle scalar integer types (e.g., maze_seed: pub u32)
+        // Handle scalar integer types
         else if (p.type.kind === 'integer') {
-          console.log(`[DEBUG] Public input ${p.name} = ${inputValue} (integer)`);
           const field = encodeField(inputValue, 'integer', p.type.width);
-          console.log(`[DEBUG] Encoded ${p.name} as: ${Array.from(field).map(b => b.toString(16).padStart(2, '0')).join('')}`);
           publicInputFields.push(field);
         } 
         // Handle scalar field types
         else if (p.type.kind === 'field') {
-          console.log(`[DEBUG] Public input ${p.name} = ${inputValue} (field)`);
           const field = encodeField(inputValue, 'field');
-          console.log(`[DEBUG] Encoded ${p.name} as: ${Array.from(field).map(b => b.toString(16).padStart(2, '0')).join('')}`);
           publicInputFields.push(field);
         }
         else {
@@ -159,9 +189,17 @@ export class NoirService {
       publicInputsBytes.set(field, i * 32);
     });
 
-    console.log(`[DEBUG] Total public inputs: ${publicInputsBytes.length} bytes (${publicInputFields.length} fields)`);
+    return publicInputsBytes;
+  }
 
-    // Build proof blob (u32_be total_fields || public_inputs || proof)
+  /**
+   * Builds a proof blob from public inputs and proof bytes
+   *
+   * @param publicInputsBytes - Encoded public inputs
+   * @param proofBytes - Proof bytes (can be dummy/invalid for testing)
+   * @returns Proof blob and proof ID
+   */
+  buildProofBlob(publicInputsBytes: Uint8Array, proofBytes: Uint8Array): { proofBlob: Uint8Array; proofId: string } {
     const proofFieldCount = proofBytes.length / 32;
     const publicInputFieldCount = publicInputsBytes.length / 32;
     const totalFields = proofFieldCount + publicInputFieldCount;
@@ -185,26 +223,7 @@ export class NoirService {
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
 
-    // Load pre-generated VK (generated with: bb write_vk --oracle_hash keccak --output_format fields)
-    console.log(`[6/6] Loading verification key...`);
-    const vkResponse = await fetch(`/circuits/${circuitName}_vk.json`);
-    if (!vkResponse.ok) {
-      throw new Error(`Failed to load VK for circuit: ${circuitName}`);
-    }
-    // Load VK as raw bytes (same as Python script does with read_bytes())
-    const vkArrayBuffer = await vkResponse.arrayBuffer();
-    const vkJson = new Uint8Array(vkArrayBuffer);
-
-    console.log(`[6/6] Complete! Proof ID: ${proofId}`);
-
-    return {
-      proof: proofBytes,
-      publicInputs: publicInputsBytes,
-      proofBlob,
-      vkJson,
-      proofId,
-      proofTime
-    };
+    return { proofBlob, proofId };
   }
 
   /**

@@ -14,7 +14,7 @@ use error::Error;
 #[contract]
 pub struct GuessTheNumber;
 
-const THE_NUMBER: &Symbol = &symbol_short!("n");
+const THE_PUZZLE: &Symbol = &symbol_short!("n");
 pub const ADMIN_KEY: &Symbol = &symbol_short!("ADMIN");
 
 pub const ULTRAHONK_CONTRACT_ADDRESS: &str = "CAXMCB6EYJ6Z6PHHC3MZ54IKHAZV5WSM2OAK4DSGM2E2M6DJG4FX5CPB";
@@ -32,39 +32,33 @@ impl GuessTheNumber {
         xlm::token_client(env).transfer(
             &admin,
             env.current_contract_address(),
-            &xlm::to_stroops(1),
+            &xlm::to_stroops(10),
         );
         // Set the admin in storage
         Self::set_admin(env, admin);
-        // Set a random number between 1 and 10
-        Self::reset_number(env);
     }
 
-    /// Update the number. Only callable by admin.
-    pub fn reset(env: &Env) {
-        Self::require_admin(env);
-        Self::reset_number(env);
+    // Set a new puzzle to play
+    pub fn set_puzzle(env: Env, puzzle: Bytes) {
+        Self::require_admin(&env);
+        env.storage().instance().set(THE_PUZZLE, &puzzle);
     }
 
-    // Private function to reset the number to a new random value
-    // which doesn't require auth from the admin
-    fn reset_number(env: &Env) {
-        let new_number: u64 = env.prng().gen_range(1..=10);
-        env.storage().instance().set(THE_NUMBER, &new_number);
-    }
+    pub fn verify_puzzle(env: Env, guesser: Address, vk_json: Bytes, proof_blob: Bytes) -> Result<BytesN<32>, Error> {
+        // take a fee before doing anything and starting any validation
+        guesser.require_auth();
+        let xlm_client = xlm::token_client(&env);
+        let contract_address = env.current_contract_address();
+        let _ = xlm_client
+                .try_transfer(&guesser, &contract_address, &xlm::to_stroops(1))
+                .map_err(|_| Error::FailedToTransferFromGuesser)?;
 
-    pub fn verify_proof(env: Env, vk_json: Bytes, proof_blob: Bytes) -> Result<BytesN<32>, Error> {
         let ultrahonk_contract_address = Address::from_str(&env, ULTRAHONK_CONTRACT_ADDRESS);
         let ultrahonk_client = ultrahonk_contract::Client::new(&env, &ultrahonk_contract_address);
-        Ok(ultrahonk_client.verify_proof(&vk_json, &proof_blob))
-    }
 
-    /// Guess a number between 1 and 10
-    pub fn guess(env: &Env, a_number: u64, guesser: Address) -> Result<bool, Error> {
-        let xlm_client = xlm::token_client(env);
-        let contract_address = env.current_contract_address();
-        let guessed_it = a_number == Self::number(env);
-        if guessed_it {
+        let proof_verified = Ok(ultrahonk_client.verify_proof(&vk_json, &proof_blob));
+
+        if proof_verified.is_ok() {
             let balance = xlm_client.balance(&contract_address);
             if balance == 0 {
                 return Err(Error::NoBalanceToTransfer);
@@ -74,13 +68,8 @@ impl GuessTheNumber {
             let _ = xlm_client
                 .try_transfer(&contract_address, &guesser, &balance)
                 .map_err(|_| Error::FailedToTransferToGuesser)?;
-        } else {
-            guesser.require_auth();
-            let _ = xlm_client
-                .try_transfer(&guesser, &contract_address, &xlm::to_stroops(1))
-                .map_err(|_| Error::FailedToTransferFromGuesser)?;
         }
-        Ok(guessed_it)
+        proof_verified
     }
 
     /// Admin can add more funds to the contract
@@ -100,10 +89,8 @@ impl GuessTheNumber {
 
     /// readonly function to get the current number
     /// `pub(crate)` makes it accessible in the same crate, but not outside of it
-    pub(crate) fn number(env: &Env) -> u64 {
-        // We can unwrap because the number is set in the constructor
-        // and then only reset by the admin
-        unsafe { env.storage().instance().get(THE_NUMBER).unwrap_unchecked() }
+    pub(crate) fn puzzle(env: &Env) -> Bytes {
+        env.storage().instance().get(THE_PUZZLE).unwrap()
     }
 
     /// Get current admin
@@ -126,5 +113,3 @@ impl GuessTheNumber {
         admin.require_auth();
     }
 }
-
-mod test;

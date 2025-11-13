@@ -10,7 +10,7 @@ const Home: React.FC = () => (
       </Text>
       <Text as="p" size="md">
         Solve Sudoku puzzles and generate zero-knowledge proofs that verify your solution
-        on the Stellar blockchain using UltraHonk proof system.
+        on the Stellar blockchain using the UltraHonk proof system.
       </Text>
       <Sudoku />
     </Layout.Inset>
