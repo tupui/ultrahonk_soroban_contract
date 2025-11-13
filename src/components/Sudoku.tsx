@@ -94,7 +94,7 @@ export const Sudoku: React.FC = () => {
 
   const setGivenCells = useCallback((puzzle: number[]) => {
     const newGivenIndices = new Set<number>();
-    const newGrid = [...grid];
+    const newGrid = new Array(81).fill(0);
     
     puzzle.forEach((value, index) => {
       if (value > 0) {
@@ -105,7 +105,7 @@ export const Sudoku: React.FC = () => {
     
     setGivenIndices(newGivenIndices);
     setGrid(newGrid);
-  }, [grid]);
+  }, []);
 
   const clearGrid = useCallback(() => {
     setGrid(new Array(81).fill(0));
@@ -135,6 +135,8 @@ export const Sudoku: React.FC = () => {
     // Fill in the complete solution (given cells are already set and locked)
     setGrid(EXAMPLE_SOLUTION);
     setSolution(EXAMPLE_SOLUTION);
+    const preFilledCount = EXAMPLE_PUZZLE.filter(v => v > 0).length;
+    setDifficulty(preFilledCount);
     setOutput('✓ Example sudoku loaded. Base grid numbers are locked.');
   }, [clearGrid, setGivenCells]);
 
