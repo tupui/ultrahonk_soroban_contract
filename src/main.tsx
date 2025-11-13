@@ -1,3 +1,8 @@
+// Ensure window is available for bb.js before any imports
+if (typeof window === 'undefined' && typeof globalThis !== 'undefined') {
+  (globalThis as any).window = globalThis;
+}
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";

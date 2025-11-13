@@ -6,31 +6,16 @@
  * - Execute circuits with user inputs to generate witnesses
  * - Generate UltraHonk proofs using the bb.js backend
  * - Build proof blobs compatible with the Stellar verifier contract
- * - Optionally submit proofs to Stellar for on-chain verification
  */
 
 import { Noir } from '@noir-lang/noir_js';
 import { UltraHonkBackend } from '@aztec/bb.js';
 import { keccak_256 } from '@noble/hashes/sha3.js';
-import { StellarService } from './StellarService';
 
 /**
- * Service for generating and verifying UltraHonk proofs from Noir circuits
+ * Service for generating UltraHonk proofs from Noir circuits
  */
 export class NoirService {
-  private stellarService?: StellarService;
-
-  /**
-   * Creates a new NoirService instance
-   *
-   * @param enableStellar - Whether to enable Stellar integration for on-chain verification
-   */
-  constructor(enableStellar: boolean = true) {
-    if (enableStellar) {
-      this.stellarService = new StellarService();
-    }
-  }
-
   /**
    * Generates an UltraHonk proof for a given circuit and inputs
    *
@@ -43,7 +28,7 @@ export class NoirService {
    * 6. Computes proof ID as Keccak-256 hash of the proof blob
    * 7. Loads the pre-generated verification key
    *
-   * @param circuitName - Name of the circuit (e.g., 'simple_circuit', 'zkp_maze')
+   * @param circuitName - Name of the circuit (e.g., 'simple_circuit', 'zkp_maze', 'sudoku')
    * @param inputs - Circuit input values as key-value pairs
    * @returns Proof data including proof bytes, public inputs, proof blob, VK, and proof ID
    */
@@ -223,39 +208,6 @@ export class NoirService {
   }
 
   /**
-   * Generates a proof and submits it to Stellar for on-chain verification
-   *
-   * This is a convenience method that combines generateProof() and StellarService.verifyProof()
-   *
-   * @param circuitName - Name of the circuit to prove
-   * @param inputs - Circuit input values
-   * @returns Combined proof generation and verification results
-   */
-  async generateAndVerifyProof(circuitName: string, inputs: Record<string, any>) {
-    console.log(`[NoirService] Starting proof generation and verification for ${circuitName}`);
-
-    // Generate proof
-    const proofResult = await this.generateProof(circuitName, inputs);
-
-    // Verify on Stellar
-    if (!this.stellarService) {
-      throw new Error('StellarService not initialized. Create NoirService with enableStellar=true');
-    }
-
-    console.log(`[NoirService] Submitting proof to Stellar...`);
-    const verificationResult = await this.stellarService.verifyProof(
-      proofResult.vkJson,
-      proofResult.proofBlob,
-      proofResult.proofId
-    );
-
-    return {
-      ...proofResult,
-      verification: verificationResult,
-    };
-  }
-
-  /**
    * Retrieves circuit metadata including parameter definitions
    *
    * Useful for dynamically generating input forms or validating inputs
@@ -290,3 +242,4 @@ export class NoirService {
     };
   }
 }
+

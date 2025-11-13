@@ -3,7 +3,7 @@ import { rpcUrl } from './util';
 
 export default new Client.Client({
   networkPassphrase: 'Standalone Network ; February 2017',
-  contractId: 'CAURK5U2JXHODOVKYPIZXWT7ZZUV3H36AIC5G6NVZRIDN4HJTQTXHPQ2',
+  contractId: 'CAW6JTAFL5LA5BBO4GIMPMSTYHFVMPAEKKT7NFYXLTNJ525FP4IYFK6W',
   rpcUrl,
   allowHttp: true,
   publicKey: undefined,

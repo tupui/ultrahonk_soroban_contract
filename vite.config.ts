@@ -12,6 +12,8 @@ export default defineConfig(() => {
         include: ["buffer"],
         globals: {
           Buffer: true,
+          global: true,
+          process: true,
         },
       }),
       wasm(),
@@ -20,13 +22,27 @@ export default defineConfig(() => {
       target: "esnext",
     },
     optimizeDeps: {
-      exclude: ["@stellar/stellar-xdr-json"],
+      exclude: [
+        "@stellar/stellar-xdr-json",
+        "@noir-lang/noir_wasm",
+        "@noir-lang/noirc_abi",
+        "@noir-lang/acvm_js",
+        "@noir-lang/noir_js",
+        "@aztec/bb.js",
+      ],
     },
+    assetsInclude: ["**/*.wasm"],
     define: {
-      global: "window",
+      global: "globalThis",
+      "process.env": "{}",
+      "typeof window": '"object"',
     },
     envPrefix: "PUBLIC_",
     server: {
+      headers: {
+        "Cross-Origin-Embedder-Policy": "credentialless",
+        "Cross-Origin-Opener-Policy": "same-origin",
+      },
       proxy: {
         "/friendbot": {
           target: "http://localhost:8000/friendbot",
