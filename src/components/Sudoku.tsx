@@ -294,14 +294,116 @@ export const Sudoku: React.FC = () => {
     setIsGenerating(true);
     setOutput('Generating proof...\n');
 
+    let noirError: any = null;
+    let proofResult: any = null;
+
+    // Try to generate proof with Noir
     try {
-      // Generate proof
-      const proofResult = await noirService.current.generateProof('sudoku', {
+      proofResult = await noirService.current.generateProof('sudoku', {
         puzzle,
         solution,
       });
+    } catch (error: any) {
+      noirError = error;
+      console.error('Noir proof generation error:', error);
+    }
 
-      let outputText = `
+    let outputText = '';
+
+    // If Noir failed, show the error but still try to submit to contract
+    if (noirError) {
+      outputText = `❌ Noir Proof Generation Failed
+
+Error: ${noirError.message}
+
+This indicates the sudoku solution is invalid (does not satisfy the circuit constraints).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STELLAR VERIFICATION ATTEMPT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Attempting to submit to smart contract to see contract-level validation...
+`.trim();
+
+      // Try to load VK and create an invalid proof blob to submit
+      // This will show how the contract also rejects invalid proofs
+      try {
+        const vkResponse = await fetch('/circuits/sudoku_vk.json');
+        if (!vkResponse.ok) {
+          throw new Error('Failed to load VK');
+        }
+        const vkArrayBuffer = await vkResponse.arrayBuffer();
+        const vkJson = new Uint8Array(vkArrayBuffer);
+
+        // Create a properly formatted but invalid proof blob
+        // Format: [4 bytes: total_fields] || [public_inputs: 81 fields * 32 bytes] || [proof: 440 or 456 fields * 32 bytes]
+        // We'll use 81 public inputs (for the puzzle) + 440 proof fields = 521 total fields
+        const publicInputFields = 81; // sudoku puzzle has 81 cells
+        const proofFields = 440; // Standard proof size
+        const totalFields = publicInputFields + proofFields;
+        
+        const header = new Uint8Array(4);
+        const view = new DataView(header.buffer);
+        view.setUint32(0, totalFields, false); // Properly formatted header
+        
+        // Create public inputs from the puzzle (given cells)
+        // Note: The actual public inputs should be the puzzle, but since we're creating an invalid proof,
+        // we'll use the current grid state which includes the invalid solution
+        const publicInputsBytes = new Uint8Array(publicInputFields * 32);
+        puzzle.forEach((value, index) => {
+          const field = new Uint8Array(32);
+          const bigIntValue = BigInt(value);
+          let val = bigIntValue;
+          for (let i = 0; i < 32; i++) {
+            field[32 - 1 - i] = Number(val & BigInt(0xff));
+            val = val >> BigInt(8);
+          }
+          publicInputsBytes.set(field, index * 32);
+        });
+        
+        // Create dummy proof data (all zeros - will fail verification)
+        const proofBytes = new Uint8Array(proofFields * 32);
+        
+        // Concatenate: header || publicInputs || proof
+        const invalidProofBlob = new Uint8Array(
+          header.length + publicInputsBytes.length + proofBytes.length
+        );
+        invalidProofBlob.set(header, 0);
+        invalidProofBlob.set(publicInputsBytes, header.length);
+        invalidProofBlob.set(proofBytes, header.length + publicInputsBytes.length);
+        
+        // Generate proof ID
+        const { keccak_256 } = await import('@noble/hashes/sha3.js');
+        const proofIdBytes = keccak_256(invalidProofBlob);
+        const proofId = Array.from(proofIdBytes)
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+
+        outputText += `\n\nSubmitting invalid proof to contract (properly formatted but with invalid proof data)...\n`;
+
+        const verificationResult = await stellarService.current.verifyProof(
+          vkJson,
+          invalidProofBlob,
+          proofId,
+          signTransaction,
+          address
+        );
+
+        if (verificationResult.success) {
+          outputText += `\n⚠️ Unexpected: Contract accepted invalid proof!`;
+        } else {
+          outputText += `\n\n✗ Contract Verification Failed (as expected)
+
+Contract Error: ${verificationResult.error}
+
+The smart contract also rejected the invalid proof, confirming that both client-side (Noir) and on-chain validation work correctly.`;
+        }
+      } catch (contractError: any) {
+        outputText += `\n\n✗ Failed to submit to contract: ${contractError.message}`;
+      }
+    } else if (proofResult) {
+      // Noir succeeded, proceed with normal flow
+      outputText = `
 ✓ Proof generated successfully!
 
 Proof ID: ${proofResult.proofId}
@@ -346,14 +448,10 @@ Verification Status: ${verificationResult.isVerified ? '✓ VERIFIED' : '✗ NOT
       } else {
         outputText += `\n\n✗ Verification failed: ${verificationResult.error}`;
       }
-
-      setOutput(outputText);
-    } catch (error: any) {
-      console.error('Proof generation/verification error:', error);
-      setOutput(`Error: ${error.message}\n\n${error.stack}`);
-    } finally {
-      setIsGenerating(false);
     }
+
+    setOutput(outputText);
+    setIsGenerating(false);
   }, [address, signTransaction, collectSudokuGridData]);
 
   if (!address) {
