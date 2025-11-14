@@ -14,7 +14,7 @@ use error::Error;
 #[contract]
 pub struct GuessTheNumber;
 
-const THE_PUZZLE: &Symbol = &symbol_short!("n");
+pub const THE_PUZZLE: &Symbol = &symbol_short!("n");
 pub const ADMIN_KEY: &Symbol = &symbol_short!("ADMIN");
 
 pub const ULTRAHONK_CONTRACT_ADDRESS: &str = "CAXMCB6EYJ6Z6PHHC3MZ54IKHAZV5WSM2OAK4DSGM2E2M6DJG4FX5CPB";
@@ -44,6 +44,7 @@ impl GuessTheNumber {
         env.storage().instance().set(THE_PUZZLE, &puzzle);
     }
 
+    /// Verify the puzzle is correctly solved
     pub fn verify_puzzle(env: Env, guesser: Address, vk_json: Bytes, proof_blob: Bytes) -> Result<BytesN<32>, Error> {
         // take a fee before doing anything and starting any validation
         guesser.require_auth();
@@ -53,11 +54,12 @@ impl GuessTheNumber {
                 .try_transfer(&guesser, &contract_address, &xlm::to_stroops(1))
                 .map_err(|_| Error::FailedToTransferFromGuesser)?;
 
+        // proof validation itself
         let ultrahonk_contract_address = Address::from_str(&env, ULTRAHONK_CONTRACT_ADDRESS);
         let ultrahonk_client = ultrahonk_contract::Client::new(&env, &ultrahonk_contract_address);
-
         let proof_verified = Ok(ultrahonk_client.verify_proof(&vk_json, &proof_blob));
 
+        // get the prize pot or not
         if proof_verified.is_ok() {
             let balance = xlm_client.balance(&contract_address);
             if balance == 0 {
@@ -87,9 +89,8 @@ impl GuessTheNumber {
         env.deployer().update_current_contract_wasm(new_wasm_hash);
     }
 
-    /// readonly function to get the current number
-    /// `pub(crate)` makes it accessible in the same crate, but not outside of it
-    pub(crate) fn puzzle(env: &Env) -> Bytes {
+    /// Read only function to get the current number
+    pub fn puzzle(env: &Env) -> Bytes {
         env.storage().instance().get(THE_PUZZLE).unwrap()
     }
 

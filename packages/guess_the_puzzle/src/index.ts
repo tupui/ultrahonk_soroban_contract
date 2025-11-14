@@ -76,6 +76,7 @@ export interface Client {
 
   /**
    * Construct and simulate a verify_puzzle transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   * Verify the puzzle is correctly solved
    */
   verify_puzzle: ({guesser, vk_json, proof_blob}: {guesser: string, vk_json: Buffer, proof_blob: Buffer}, options?: {
     /**
@@ -135,6 +136,27 @@ export interface Client {
      */
     simulate?: boolean;
   }) => Promise<AssembledTransaction<null>>
+
+  /**
+   * Construct and simulate a puzzle transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   * Read only function to get the current number
+   */
+  puzzle: (options?: {
+    /**
+     * The fee to pay for the transaction. Default: BASE_FEE
+     */
+    fee?: number;
+
+    /**
+     * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+     */
+    timeoutInSeconds?: number;
+
+    /**
+     * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+     */
+    simulate?: boolean;
+  }) => Promise<AssembledTransaction<Buffer>>
 
   /**
    * Construct and simulate a admin transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
@@ -201,9 +223,10 @@ export class Client extends ContractClient {
       new ContractSpec([ "AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAAwAAADJUaGUgY29udHJhY3QgZmFpbGVkIHRvIHRyYW5zZmVyIFhMTSB0byB0aGUgZ3Vlc3NlcgAAAAAAGUZhaWxlZFRvVHJhbnNmZXJUb0d1ZXNzZXIAAAAAAAABAAAAMlRoZSBndWVzc2VyIGZhaWxlZCB0byB0cmFuc2ZlciBYTE0gdG8gdGhlIGNvbnRyYWN0AAAAAAAbRmFpbGVkVG9UcmFuc2ZlckZyb21HdWVzc2VyAAAAAAIAAAA2VGhlIGNvbnRyYWN0IGhhcyBubyBiYWxhbmNlIHRvIHRyYW5zZmVyIHRvIHRoZSBndWVzc2VyAAAAAAATTm9CYWxhbmNlVG9UcmFuc2ZlcgAAAAAD",
         "AAAAAAAAAEhDb25zdHJ1Y3RvciB0byBpbml0aWFsaXplIHRoZSBjb250cmFjdCB3aXRoIGFuIGFkbWluIGFuZCBhIHJhbmRvbSBudW1iZXIAAAANX19jb25zdHJ1Y3RvcgAAAAAAAAEAAAAAAAAABWFkbWluAAAAAAAAEwAAAAA=",
         "AAAAAAAAAAAAAAAKc2V0X3B1enpsZQAAAAAAAQAAAAAAAAAGcHV6emxlAAAAAAAOAAAAAA==",
-        "AAAAAAAAAAAAAAANdmVyaWZ5X3B1enpsZQAAAAAAAAMAAAAAAAAAB2d1ZXNzZXIAAAAAEwAAAAAAAAAHdmtfanNvbgAAAAAOAAAAAAAAAApwcm9vZl9ibG9iAAAAAAAOAAAAAQAAA+kAAAPuAAAAIAAAAAM=",
+        "AAAAAAAAACVWZXJpZnkgdGhlIHB1enpsZSBpcyBjb3JyZWN0bHkgc29sdmVkAAAAAAAADXZlcmlmeV9wdXp6bGUAAAAAAAADAAAAAAAAAAdndWVzc2VyAAAAABMAAAAAAAAAB3ZrX2pzb24AAAAADgAAAAAAAAAKcHJvb2ZfYmxvYgAAAAAADgAAAAEAAAPpAAAD7gAAACAAAAAD",
         "AAAAAAAAAChBZG1pbiBjYW4gYWRkIG1vcmUgZnVuZHMgdG8gdGhlIGNvbnRyYWN0AAAACWFkZF9mdW5kcwAAAAAAAAEAAAAAAAAABmFtb3VudAAAAAAACwAAAAA=",
         "AAAAAAAAADlVcGdyYWRlIHRoZSBjb250cmFjdCB0byBuZXcgd2FzbS4gT25seSBjYWxsYWJsZSBieSBhZG1pbi4AAAAAAAAHdXBncmFkZQAAAAABAAAAAAAAAA1uZXdfd2FzbV9oYXNoAAAAAAAD7gAAACAAAAAA",
+        "AAAAAAAAACxSZWFkIG9ubHkgZnVuY3Rpb24gdG8gZ2V0IHRoZSBjdXJyZW50IG51bWJlcgAAAAZwdXp6bGUAAAAAAAAAAAABAAAADg==",
         "AAAAAAAAABFHZXQgY3VycmVudCBhZG1pbgAAAAAAAAVhZG1pbgAAAAAAAAAAAAABAAAD6AAAABM=",
         "AAAAAAAAAChTZXQgYSBuZXcgYWRtaW4uIE9ubHkgY2FsbGFibGUgYnkgYWRtaW4uAAAACXNldF9hZG1pbgAAAAAAAAEAAAAAAAAABWFkbWluAAAAAAAAEwAAAAA=" ]),
       options
@@ -214,6 +237,7 @@ export class Client extends ContractClient {
         verify_puzzle: this.txFromJSON<Result<Buffer>>,
         add_funds: this.txFromJSON<null>,
         upgrade: this.txFromJSON<null>,
+        puzzle: this.txFromJSON<Buffer>,
         admin: this.txFromJSON<Option<string>>,
         set_admin: this.txFromJSON<null>
   }

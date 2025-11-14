@@ -52,6 +52,7 @@ export interface Client {
     }) => Promise<AssembledTransaction<null>>;
     /**
      * Construct and simulate a verify_puzzle transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Verify the puzzle is correctly solved
      */
     verify_puzzle: ({ guesser, vk_json, proof_blob }: {
         guesser: string;
@@ -111,6 +112,24 @@ export interface Client {
          */
         simulate?: boolean;
     }) => Promise<AssembledTransaction<null>>;
+    /**
+     * Construct and simulate a puzzle transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Read only function to get the current number
+     */
+    puzzle: (options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<Buffer>>;
     /**
      * Construct and simulate a admin transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
      * Get current admin
@@ -172,6 +191,7 @@ export declare class Client extends ContractClient {
         verify_puzzle: (json: string) => AssembledTransaction<Result<Buffer<ArrayBufferLike>, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
         add_funds: (json: string) => AssembledTransaction<null>;
         upgrade: (json: string) => AssembledTransaction<null>;
+        puzzle: (json: string) => AssembledTransaction<Buffer<ArrayBufferLike>>;
         admin: (json: string) => AssembledTransaction<Option<string>>;
         set_admin: (json: string) => AssembledTransaction<null>;
     };
