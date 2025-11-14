@@ -19,7 +19,7 @@ export const GuessThePuzzle = () => {
 
   const submitGuess = async () => {
     if (!theGuess || !address) return;
-    const { result } = await game.guess({
+    const { result } = await (game as any).guess({
       a_number: BigInt(theGuess),
       guesser: address,
     });

@@ -35,7 +35,6 @@ export default defineConfig(() => {
     define: {
       global: "globalThis",
       "process.env": "{}",
-      "typeof window": '"object"',
     },
     envPrefix: "PUBLIC_",
     server: {

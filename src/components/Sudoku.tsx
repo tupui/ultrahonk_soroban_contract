@@ -13,7 +13,7 @@ const EXAMPLE_SOLUTION = [5,3,4,6,7,8,9,1,2,6,7,2,1,9,5,3,4,8,1,9,8,3,4,2,5,6,7,
 export const Sudoku: React.FC = () => {
   const { address, signTransaction } = useWallet();
   const [grid, setGrid] = useState<number[]>(new Array(81).fill(0));
-  const [solution, setSolution] = useState<number[]>(new Array(81).fill(0));
+  const [, setSolution] = useState<number[]>(new Array(81).fill(0));
   const [givenIndices, setGivenIndices] = useState<Set<number>>(new Set());
   const [difficulty, setDifficulty] = useState(30);
   const [validationErrors, setValidationErrors] = useState<Set<number>>(new Set());
@@ -277,6 +277,14 @@ export const Sudoku: React.FC = () => {
       return;
     }
 
+    const walletSignTransaction = async (xdr: string) => {
+      const signed = await signTransaction(xdr);
+      return {
+        signedTxXdr: signed.signedTxXdr,
+        signerAddress: signed.signerAddress ?? address,
+      };
+    };
+
     const { puzzle, solution } = collectSudokuGridData();
 
     // Validate that solution is complete
@@ -353,7 +361,7 @@ Attempting to submit to smart contract to see contract-level validation...
           vkJson,
           proofBlob,
           proofId,
-          signTransaction,
+          walletSignTransaction,
           address
         );
 
@@ -381,7 +389,7 @@ VK Size: ${proofResult.vkJson.length} bytes
 Time: ${proofResult.proofTime}s
 
 Proof Blob (first 100 bytes):
-${Array.from(proofResult.proofBlob.slice(0, 100)).map(b => b.toString(16).padStart(2, '0')).join(' ')}...
+${Array.from((proofResult.proofBlob as Uint8Array).slice(0, 100)).map((byte) => byte.toString(16).padStart(2, '0')).join(' ')}...
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STELLAR VERIFICATION
@@ -393,7 +401,7 @@ STELLAR VERIFICATION
         proofResult.vkJson,
         proofResult.proofBlob,
         proofResult.proofId,
-        signTransaction,
+        walletSignTransaction,
         address
       );
 

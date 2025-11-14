@@ -27,4 +27,6 @@ Cargo.lock
 .vite
 .DS_Store
 
+dist
+
 node_modules

@@ -6,10 +6,11 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <title>Scaffold Stellar Sudoku with Noir App</title>
     <script>
-      // Ensure window is available for bb.js
-      if (typeof window === 'undefined') {
-        var window = globalThis;
-      }
+      (function ensureWindow() {
+        if (!globalThis.window) {
+          globalThis.window = globalThis;
+        }
+      })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

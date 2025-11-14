@@ -12,7 +12,7 @@ mod xlm;
 use error::Error;
 
 #[contract]
-pub struct GuessTheNumber;
+pub struct GuessThePuzzle;
 
 pub const THE_PUZZLE: &Symbol = &symbol_short!("n");
 pub const ADMIN_KEY: &Symbol = &symbol_short!("ADMIN");
@@ -21,7 +21,7 @@ pub const ULTRAHONK_CONTRACT_ADDRESS: &str = "CAXMCB6EYJ6Z6PHHC3MZ54IKHAZV5WSM2O
 
 
 #[contractimpl]
-impl GuessTheNumber {
+impl GuessThePuzzle {
     /// Constructor to initialize the contract with an admin and a random number
     pub fn __constructor(env: &Env, admin: Address) {
         // Require auth from the admin to make the transfer
