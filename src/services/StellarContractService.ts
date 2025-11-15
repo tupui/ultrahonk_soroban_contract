@@ -9,26 +9,6 @@ import { Buffer } from 'buffer';
 import game from '../contracts/guess_the_puzzle';
 
 /**
- * Result of a proof verification transaction on Stellar
- */
-export interface VerificationResult {
-  /** Whether the verification transaction succeeded */
-  success: boolean;
-  /** Hex-encoded Keccak-256 hash of the proof blob */
-  proofId: string;
-  /** Stellar transaction hash */
-  txHash?: string;
-  /** Whether the proof is verified on-chain (from is_verified query) */
-  isVerified: boolean;
-  /** CPU instructions consumed by the verification (from simulation) */
-  cpuInstructions?: number;
-  /** Transaction fee in stroops */
-  fee?: string;
-  /** Error message if verification failed */
-  error?: string;
-}
-
-/**
  * Transaction data extracted from a transaction result
  */
 export interface TransactionData {

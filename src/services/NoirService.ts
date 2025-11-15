@@ -226,39 +226,5 @@ export class NoirService {
     return { proofBlob, proofId };
   }
 
-  /**
-   * Retrieves circuit metadata including parameter definitions
-   *
-   * Useful for dynamically generating input forms or validating inputs
-   *
-   * @param circuitName - Name of the circuit
-   * @returns Circuit metadata with parameter names, types, and visibility
-   */
-  async getCircuitMetadata(circuitName: string) {
-    const response = await fetch(`/circuits/${circuitName}.json`);
-    if (!response.ok) {
-      throw new Error(`Failed to load circuit: ${circuitName}`);
-    }
-    const circuit = await response.json();
-
-    // Extract parameters from ABI
-    const parameters = circuit.abi.parameters.map((param: any) => {
-      let type = param.type.kind;
-      // Check if it's an array type
-      if (param.type.kind === 'array') {
-        type = 'array';
-      }
-      return {
-        name: param.name,
-        type,
-        visibility: param.visibility,
-      };
-    });
-
-    return {
-      name: circuitName,
-      parameters,
-    };
-  }
 }
 
