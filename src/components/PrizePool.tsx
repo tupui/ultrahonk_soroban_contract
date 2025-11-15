@@ -1,45 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Button, Input, Text } from "@stellar/design-system";
 import { Box } from "./layout/Box";
 import { useWallet } from "../hooks/useWallet";
+import { usePrizePool } from "../contexts/PrizePoolContext";
 import { contractClient, StellarContractService } from "../services/StellarContractService";
 
 export const PrizePool = () => {
   const { address, signTransaction } = useWallet();
-  const [balance, setBalance] = useState<{ stroops: string; xlm: string } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const { balance, isLoading, loadPrizePot } = usePrizePool();
   const [isAdding, setIsAdding] = useState(false);
   const [amount, setAmount] = useState<string>("");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  const loadPrizePot = useCallback(async () => {
-    if (!address) {
-      setBalance(null);
-      return;
-    }
-
-    setIsLoading(true);
-    setMessage(null);
-
-    try {
-      contractClient.options.publicKey = address;
-      const tx = await contractClient.prize_pot();
-      const result = tx.result;
-      
-      if (result !== undefined && result !== null) {
-        const stroops = result.toString();
-        const xlm = StellarContractService.formatStroopsToXlm(stroops);
-        setBalance({ stroops, xlm });
-      } else {
-        throw new Error('No result from prize_pot simulation');
-      }
-    } catch (error: any) {
-      setMessage({ type: "error", text: error.message || "Failed to load prize pool balance" });
-      setBalance({ stroops: "0", xlm: "0.0000000" });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [address]);
 
   useEffect(() => {
     loadPrizePot();

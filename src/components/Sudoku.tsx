@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button, Text } from '@stellar/design-system';
 import { useWallet } from '../hooks/useWallet';
+import { useWalletBalance } from '../hooks/useWalletBalance';
+import { usePrizePool } from '../contexts/PrizePoolContext';
 import { generateRandomSudoku } from '../util/sudokuGenerator';
 import { NoirService } from '../services/NoirService';
 import { contractClient, StellarContractService } from '../services/StellarContractService';
@@ -12,6 +14,8 @@ const EXAMPLE_SOLUTION = [5,3,4,6,7,8,9,1,2,6,7,2,1,9,5,3,4,8,1,9,8,3,4,2,5,6,7,
 
 export const Sudoku: React.FC = () => {
   const { address, signTransaction } = useWallet();
+  const { updateBalance } = useWalletBalance();
+  const { loadPrizePot } = usePrizePool();
   const [grid, setGrid] = useState<number[]>(new Array(81).fill(0));
   const [, setSolution] = useState<number[]>(new Array(81).fill(0));
   const [givenIndices, setGivenIndices] = useState<Set<number>>(new Set());
@@ -370,6 +374,12 @@ Attempting to submit to smart contract to see contract-level validation...
           const result = await tx.signAndSend({ signTransaction: walletSignTransaction });
           const txData = StellarContractService.extractTransactionData(result);
 
+          // Refresh prize pool and wallet balance after verification attempt
+          setTimeout(() => {
+            loadPrizePot();
+            updateBalance();
+          }, 2000);
+
           if (txData.success) {
             outputText += `\n⚠️ Unexpected: Contract accepted invalid proof!`;
           } else {
@@ -378,6 +388,12 @@ Attempting to submit to smart contract to see contract-level validation...
 The smart contract also rejected the invalid proof, confirming that both client-side (Noir) and on-chain validation work correctly.`;
           }
         } catch (contractError: any) {
+          // Refresh prize pool and wallet balance after verification attempt (even on error)
+          setTimeout(() => {
+            loadPrizePot();
+            updateBalance();
+          }, 2000);
+
           outputText += `\n\n✗ Contract Verification Failed (as expected)
 
 Contract Error: ${contractError.message}
@@ -422,6 +438,12 @@ STELLAR VERIFICATION
         const result = await tx.signAndSend({ signTransaction: walletSignTransaction });
         const txData = StellarContractService.extractTransactionData(result);
 
+        // Refresh prize pool and wallet balance after verification attempt
+        setTimeout(() => {
+          loadPrizePot();
+          updateBalance();
+        }, 2000);
+
         if (txData.success) {
           outputText += `\n\n✓ Proof verified on Stellar!
 
@@ -442,13 +464,19 @@ Verification Status: ✓ VERIFIED`;
           outputText += `\n\n✗ Verification failed`;
         }
       } catch (error: any) {
+        // Refresh prize pool and wallet balance after verification attempt (even on error)
+        setTimeout(() => {
+          loadPrizePot();
+          updateBalance();
+        }, 2000);
+
         outputText += `\n\n✗ Verification failed: ${error.message || String(error)}`;
       }
     }
 
     setOutput(outputText);
     setIsGenerating(false);
-  }, [address, signTransaction, collectSudokuGridData]);
+  }, [address, signTransaction, collectSudokuGridData, loadPrizePot, updateBalance]);
 
   if (!address) {
     return (

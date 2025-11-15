@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Button, Input, Text } from "@stellar/design-system";
 import { Box } from "./layout/Box";
 import storage from "../util/storage";
-import { updateContractId } from "../contracts/guess_the_puzzle";
 
 const DEFAULT_CONTRACT_ID = 'CBXWA6DTDZTSOQ4LSUDW4XFUJSZK5MA5T5HEI5GD5ZJGW2OBEHTS4J4W';
 
@@ -40,9 +39,8 @@ export const ContractConfig = () => {
     try {
       // Store the contract ID
       storage.setItem('contractId', contractId);
-      // Update the contract client with the new ID
-      updateContractId();
-      setMessage({ type: "success", text: "Contract address updated successfully!" });
+      // Note: Contract client will need to be re-initialized or reloaded to use the new ID
+      setMessage({ type: "success", text: "Contract address updated successfully! Please refresh the page to use the new contract." });
       
       // Clear message after 5 seconds
       setTimeout(() => {

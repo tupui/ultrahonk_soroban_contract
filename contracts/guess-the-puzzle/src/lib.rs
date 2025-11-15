@@ -50,6 +50,8 @@ impl GuessThePuzzle {
         guesser.require_auth();
         let xlm_client = xlm::token_client(&env);
         let contract_address = env.current_contract_address();
+        // Methods `try_*` will return an error if the method fails
+        // `.map_err` lets us convert the error to our custom Error type
         let _ = xlm_client
                 .try_transfer(&guesser, &contract_address, &xlm::to_stroops(1))
                 .map_err(|_| Error::FailedToTransferFromGuesser)?;
@@ -57,21 +59,20 @@ impl GuessThePuzzle {
         // proof validation itself
         let ultrahonk_contract_address = Address::from_str(&env, ULTRAHONK_CONTRACT_ADDRESS);
         let ultrahonk_client = ultrahonk_contract::Client::new(&env, &ultrahonk_contract_address);
-        let proof_verified = Ok(ultrahonk_client.verify_proof(&vk_json, &proof_blob));
 
-        // get the prize pot or not
-        if proof_verified.is_ok() {
-            let balance = xlm_client.balance(&contract_address);
-            if balance == 0 {
-                return Err(Error::NoBalanceToTransfer);
-            }
-            // Methods `try_*` will return an error if the method fails
-            // `.map_err` lets us convert the error to our custom Error type
-            let _ = xlm_client
-                .try_transfer(&contract_address, &guesser, &balance)
-                .map_err(|_| Error::FailedToTransferToGuesser)?;
+        match ultrahonk_client.try_verify_proof(&vk_json, &proof_blob) {
+            Ok(Ok(result)) => {
+                let balance = xlm_client.balance(&contract_address);
+                if balance == 0 {
+                    return Err(Error::NoBalanceToTransfer);
+                }
+                let _ = xlm_client
+                    .try_transfer(&contract_address, &guesser, &balance)
+                    .map_err(|_| Error::FailedToTransferToGuesser)?;
+                Ok(result)
+            },
+            _ => Ok(BytesN::from_array(&env, &[0; 32])),
         }
-        proof_verified
     }
 
     pub fn prize_pot(env: &Env) -> i128 {
@@ -118,3 +119,4 @@ impl GuessThePuzzle {
         admin.require_auth();
     }
 }
+
