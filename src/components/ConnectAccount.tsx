@@ -22,4 +22,4 @@ const ConnectAccount: React.FC = () => {
   );
 };
 
-export default ConnectAccount;
+export { ConnectAccount as default };

@@ -5,24 +5,26 @@ import { ContractConfig } from "../components/ContractConfig";
 import { PrizePool } from "../components/PrizePool";
 import { Box } from "../components/layout/Box";
 
-const Home: React.FC = () => (
-  <Layout.Content>
-    <Layout.Inset>
-      <Text as="h1" size="xl">
-        Sudoku Proof Generator
-      </Text>
-      <Text as="p" size="md">
-        Solve Sudoku puzzles and generate zero-knowledge proofs that verify your solution
-        on the Stellar blockchain using the UltraHonk proof system.
-      </Text>
-      
-      <Box gap="xl" direction="column" style={{ marginTop: "2rem" }}>
-        <ContractConfig />
-        <PrizePool />
-        <Sudoku />
-      </Box>
-    </Layout.Inset>
-  </Layout.Content>
-);
+const Home: React.FC = () => {
+  return (
+    <Layout.Content>
+      <Layout.Inset>
+        <Text as="h1" size="xl">
+          Sudoku Proof Generator
+        </Text>
+        <Text as="p" size="md">
+          Solve Sudoku puzzles and generate zero-knowledge proofs that verify your solution
+          on the Stellar blockchain using the UltraHonk proof system.
+        </Text>
+        
+        <Box gap="md" direction="column" style={{ marginTop: "2rem" }}>
+          <ContractConfig />
+          <PrizePool />
+          <Sudoku />
+        </Box>
+      </Layout.Inset>
+    </Layout.Content>
+  );
+};
 
 export default Home;

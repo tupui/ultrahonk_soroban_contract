@@ -1,8 +1,8 @@
 /**
- * StellarContractService - Handles interaction with Stellar blockchain for proof verification
+ * StellarContractService - Utility functions for Stellar blockchain interactions
  *
- * This service provides methods to submit UltraHonk proofs to a Stellar/Soroban smart contract
- * for on-chain verification. It uses contract bindings and wallet integration.
+ * This module provides utility functions for wallet operations, transaction data extraction,
+ * and formatting. Components should use contract bindings directly.
  */
 
 import { Buffer } from 'buffer';
@@ -29,230 +29,114 @@ export interface VerificationResult {
 }
 
 /**
- * Service for interacting with Stellar blockchain to verify UltraHonk proofs
+ * Transaction data extracted from a transaction result
+ */
+export interface TransactionData {
+  /** Transaction hash */
+  txHash?: string;
+  /** Transaction fee in stroops */
+  fee?: string;
+  /** CPU instructions consumed */
+  cpuInstructions?: number;
+  /** Whether transaction was successful */
+  success: boolean;
+}
+
+/**
+ * Utility functions for Stellar contract interactions
  */
 export class StellarContractService {
   /**
-   * Submits an UltraHonk proof to Stellar for on-chain verification
-   *
-   * This method:
-   * 1. Calls the verify_puzzle contract method with the guesser, VK and proof blob
-   * 2. Extracts CPU instructions from the simulation data
-   * 3. Signs and submits the transaction using wallet
-   * 4. Extracts the fee from the transaction result
-   * 5. Queries is_verified to confirm the proof was stored correctly
-   *
-   * @param vkJson - Verification key as raw bytes (from bb write_vk --oracle_hash keccak)
-   * @param proofBlob - Proof blob containing: u32_be(total_fields) || public_inputs || proof
-   * @param proofId - Hex-encoded Keccak-256 hash of the proof blob
-   * @param signTransaction - Wallet signTransaction function from useWallet hook
-   * @param address - Wallet address for setting publicKey on contract client
-   * @returns Verification result including transaction hash, fee, CPU instructions, and verification status
+   * Extract CPU instructions from a transaction simulation
+   * 
+   * @param tx - Assembled transaction with simulation data
+   * @returns CPU instructions consumed, or undefined if not available
    */
-  async verifyProof(
-    vkJson: Uint8Array,
-    proofBlob: Uint8Array,
-    proofId: string,
-    signTransaction: (xdr: string) => Promise<{ signedTxXdr: string; signerAddress: string }>,
-    address: string
-  ): Promise<VerificationResult> {
-    try {
-      console.log('[StellarContractService] Calling verify_puzzle...');
-      console.log(`[StellarContractService] VK size: ${vkJson.length} bytes`);
-      console.log(`[StellarContractService] Proof blob size: ${proofBlob.length} bytes`);
-
-      // Convert Uint8Array to Buffer
-      const vkBuffer = Buffer.from(vkJson);
-      const proofBuffer = Buffer.from(proofBlob);
-
-      // Initialize variables for result data
-      let cpuInstructions: number | undefined;
-      let fee: string | undefined;
-
-      // Update contract client with current address
-      game.options.publicKey = address;
-
-      // Call verify_puzzle with guesser parameter
-      const tx = await game.verify_puzzle({
-        guesser: address,
-        vk_json: vkBuffer,
-        proof_blob: proofBuffer,
-      });
-
-      console.log('[StellarContractService] Transaction assembled, signing and sending...');
-
-      // Extract CPU instructions from simulation
-      const simulation = (tx as any).simulation;
-      if (simulation && 'transactionData' in simulation) {
-        const txData = simulation.transactionData as any;
-        if (txData && txData._data && txData._data._attributes && txData._data._attributes.resources) {
-          const resources = txData._data._attributes.resources;
-          if (resources._attributes && 'instructions' in resources._attributes) {
-            cpuInstructions = parseInt(resources._attributes.instructions.toString());
-            console.log('[StellarContractService] CPU Instructions from simulation:', cpuInstructions);
-          }
+  static extractCpuInstructions(tx: any): number | undefined {
+    const simulation = tx?.simulation;
+    if (simulation && 'transactionData' in simulation) {
+      const txData = simulation.transactionData as any;
+      if (txData && txData._data && txData._data._attributes && txData._data._attributes.resources) {
+        const resources = txData._data._attributes.resources;
+        if (resources._attributes && 'instructions' in resources._attributes) {
+          return parseInt(resources._attributes.instructions.toString());
         }
       }
-
-      // Sign and send transaction using wallet
-      const result = await tx.signAndSend({
-        signTransaction,
-      });
-
-      console.log('[StellarContractService] Transaction sent');
-
-      // Get transaction hash from result
-      const txHash = (result as any).hash || '';
-
-      // Extract fee charged from transaction response
-      const txResponse = result.getTransactionResponse;
-      if (txResponse && txResponse.status === 'SUCCESS') {
-        fee = txResponse.resultXdr.feeCharged().toString();
-        console.log('[StellarContractService] Fee charged:', fee, 'stroops');
-      }
-
-      console.log('[StellarContractService] verify_puzzle succeeded');
-      if (cpuInstructions) {
-        console.log(`[StellarContractService] CPU Instructions: ${cpuInstructions.toLocaleString()}`);
-      }
-      if (fee) {
-        const stroops = parseInt(fee);
-        const xlm = (stroops / 10_000_000).toFixed(7);
-        console.log(`[StellarContractService] Fee: ${stroops.toLocaleString()} stroops (${xlm} XLM)`);
-      }
-
-      // Check if verification was successful from transaction result
-      const isVerified = !!(txResponse && txResponse.status === 'SUCCESS');
-
-      return {
-        success: true,
-        proofId,
-        txHash,
-        isVerified,
-        cpuInstructions,
-        fee,
-      };
-    } catch (error: any) {
-      console.error('[StellarContractService] Error:', error);
-      return {
-        success: false,
-        proofId,
-        isVerified: false,
-        error: error.message || String(error),
-      };
     }
+    return undefined;
   }
 
   /**
-   * Gets the current prize pool balance from the contract
+   * Extract transaction data from a signed transaction result
    * 
-   * @param address - Wallet address for setting publicKey on contract client
-   * @returns Prize pool balance in stroops and XLM format
+   * @param result - Result from signAndSend
+   * @returns Transaction data including hash, fee, and success status
    */
-  async getPrizePot(address: string): Promise<{ stroops: string; xlm: string; success: boolean; error?: string }> {
-    try {
-      console.log('[StellarContractService] Calling prize_pot...');
+  static extractTransactionData(result: any): TransactionData {
+    // signAndSend throws on error, so if we got here, the transaction succeeded
+    const txHash = result?.hash || result?.transactionHash || (typeof result === 'string' ? result : '');
+    let fee: string | undefined;
 
-      game.options.publicKey = address;
-
-      // Call prize_pot (read-only function, get result from simulation)
-      const tx = await game.prize_pot();
-      
-      // For read-only functions, we can get the result from the simulation
-      const result = tx.result;
-      if (!result) {
-        throw new Error('No result from prize_pot simulation');
+    // Try to get transaction response for fee information
+    let txResponse: any = null;
+    
+    if (typeof result?.getTransactionResponse === 'function') {
+      try {
+        txResponse = result.getTransactionResponse();
+      } catch (e) {
+        // Ignore errors
       }
-
-      const stroops = result.toString();
-      const xlm = (parseInt(stroops) / 10_000_000).toFixed(7);
-
-      console.log('[StellarContractService] Prize pot:', stroops, 'stroops', `(${xlm} XLM)`);
-
-      return {
-        stroops,
-        xlm,
-        success: true,
-      };
-    } catch (error: any) {
-      console.error('[StellarContractService] Error getting prize pot:', error);
-      return {
-        stroops: '0',
-        xlm: '0.0000000',
-        success: false,
-        error: error.message || String(error),
-      };
+    } else if (result?.response) {
+      txResponse = result.response;
+    } else if (result?.transactionResponse) {
+      txResponse = result.transactionResponse;
+    } else if (result && typeof result === 'object' && 'status' in result) {
+      txResponse = result;
     }
+
+    // Extract fee if available
+    if (txResponse) {
+      if (txResponse.resultXdr && typeof txResponse.resultXdr.feeCharged === 'function') {
+        fee = txResponse.resultXdr.feeCharged().toString();
+      } else if (txResponse.feeCharged) {
+        fee = txResponse.feeCharged.toString();
+      } else if (txResponse.fee) {
+        fee = txResponse.fee.toString();
+      }
+    }
+
+    // signAndSend throws on error, so if we got here without an exception, it succeeded
+    return {
+      txHash,
+      fee,
+      success: true,
+    };
   }
 
   /**
-   * Adds funds to the prize pool
+   * Format stroops to XLM
    * 
-   * This method:
-   * 1. Calls the add_funds contract method with the funder address and specified amount
-   * 2. Signs and submits the transaction using wallet
-   * 3. Returns transaction result
-   * 
-   * @param amount - Amount to add in stroops (i128)
-   * @param signTransaction - Wallet signTransaction function from useWallet hook
-   * @param address - Wallet address for the funder (who is adding the funds)
-   * @returns Transaction result including hash and fee
+   * @param stroops - Amount in stroops (string or number)
+   * @returns Formatted XLM amount as string
    */
-  async addFunds(
-    amount: string,
-    signTransaction: (xdr: string) => Promise<{ signedTxXdr: string; signerAddress: string }>,
-    address: string
-  ): Promise<{ success: boolean; txHash?: string; fee?: string; error?: string }> {
-    try {
-      console.log('[StellarContractService] Calling add_funds...');
-      console.log(`[StellarContractService] Funder: ${address}`);
-      console.log(`[StellarContractService] Amount: ${amount} stroops`);
+  static formatStroopsToXlm(stroops: string | number): string {
+    const stroopsNum = typeof stroops === 'string' ? parseInt(stroops) : stroops;
+    return (stroopsNum / 10_000_000).toFixed(7);
+  }
 
-      game.options.publicKey = address;
-
-      // Convert amount string to BigInt (stroops are i128)
-      const amountBigInt = BigInt(amount);
-
-      // Call add_funds with funder address
-      const tx = await game.add_funds({
-        funder: address,
-        amount: amountBigInt,
-      });
-
-      console.log('[StellarContractService] Transaction assembled, signing and sending...');
-
-      // Sign and send transaction using wallet
-      const result = await tx.signAndSend({
-        signTransaction,
-      });
-
-      console.log('[StellarContractService] Transaction sent');
-
-      // Get transaction hash from result
-      const txHash = (result as any).hash || '';
-
-      // Extract fee charged from transaction response
-      const txResponse = result.getTransactionResponse;
-      let fee: string | undefined;
-      if (txResponse && txResponse.status === 'SUCCESS') {
-        fee = txResponse.resultXdr.feeCharged().toString();
-        console.log('[StellarContractService] Fee charged:', fee, 'stroops');
-      }
-
-      console.log('[StellarContractService] add_funds succeeded');
-
-      return {
-        success: true,
-        txHash,
-        fee,
-      };
-    } catch (error: any) {
-      console.error('[StellarContractService] Error adding funds:', error);
-      return {
-        success: false,
-        error: error.message || String(error),
-      };
-    }
+  /**
+   * Convert Uint8Array to Buffer (for contract method calls)
+   * 
+   * @param data - Uint8Array data
+   * @returns Buffer
+   */
+  static toBuffer(data: Uint8Array): Buffer {
+    return Buffer.from(data);
   }
 }
+
+/**
+ * Export contract client for direct use by components
+ */
+export { game as contractClient };
 

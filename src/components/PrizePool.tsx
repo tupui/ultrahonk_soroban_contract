@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { Button, Input, Text, Code } from "@stellar/design-system";
+import { Button, Input, Text } from "@stellar/design-system";
 import { Box } from "./layout/Box";
 import { useWallet } from "../hooks/useWallet";
-import { StellarContractService } from "../services/StellarContractService";
-
-const stellarService = new StellarContractService();
+import { contractClient, StellarContractService } from "../services/StellarContractService";
 
 export const PrizePool = () => {
   const { address, signTransaction } = useWallet();
@@ -24,15 +22,16 @@ export const PrizePool = () => {
     setMessage(null);
 
     try {
-      const result = await stellarService.getPrizePot(address);
-      if (result.success) {
-        setBalance({
-          stroops: result.stroops,
-          xlm: result.xlm,
-        });
+      contractClient.options.publicKey = address;
+      const tx = await contractClient.prize_pot();
+      const result = tx.result;
+      
+      if (result !== undefined && result !== null) {
+        const stroops = result.toString();
+        const xlm = StellarContractService.formatStroopsToXlm(stroops);
+        setBalance({ stroops, xlm });
       } else {
-        setMessage({ type: "error", text: result.error || "Failed to load prize pool balance" });
-        setBalance({ stroops: "0", xlm: "0.0000000" });
+        throw new Error('No result from prize_pot simulation');
       }
     } catch (error: any) {
       setMessage({ type: "error", text: error.message || "Failed to load prize pool balance" });
@@ -82,12 +81,21 @@ export const PrizePool = () => {
     setMessage(null);
 
     try {
-      const result = await stellarService.addFunds(amountInStroops, signTransaction, address);
+      contractClient.options.publicKey = address;
+      const amountBigInt = BigInt(amountInStroops);
       
-      if (result.success) {
+      const tx = await contractClient.add_funds({
+        funder: address,
+        amount: amountBigInt,
+      });
+
+      const result = await tx.signAndSend({ signTransaction });
+      const txData = StellarContractService.extractTransactionData(result);
+      
+      if (txData.success) {
         setMessage({ 
           type: "success", 
-          text: `Successfully added funds! Transaction: ${result.txHash?.slice(0, 8)}...` 
+          text: `Successfully added funds! Transaction: ${txData.txHash?.slice(0, 8)}...` 
         });
         setAmount("");
         // Refresh balance after successful transaction
@@ -95,7 +103,7 @@ export const PrizePool = () => {
           loadPrizePot();
         }, 2000);
       } else {
-        setMessage({ type: "error", text: result.error || "Failed to add funds" });
+        setMessage({ type: "error", text: "Failed to add funds" });
       }
     } catch (error: any) {
       setMessage({ type: "error", text: error.message || "Failed to add funds" });
@@ -110,7 +118,7 @@ export const PrizePool = () => {
         <Text as="h2" size="lg">
           Prize Pool
         </Text>
-        <Text as="p" size="sm" variant="secondary">
+        <Text as="p" size="sm" style={{ color: "#6b7280" }}>
           Connect your wallet to view and manage the prize pool
         </Text>
       </Box>
@@ -118,81 +126,60 @@ export const PrizePool = () => {
   }
 
   return (
-    <Box gap="md" direction="column">
-      <Box gap="sm" direction="row" align="center" justify="space-between" wrap="wrap">
-        <Text as="h2" size="lg">
+    <Box gap="xs" direction="column">
+      <Box gap="sm" direction="row" align="center" wrap="wrap">
+        <Text as="h2" size="md" style={{ margin: 0 }}>
           Prize Pool
         </Text>
-        <Button
-          onClick={loadPrizePot}
-          disabled={isLoading}
-          variant="secondary"
-          size="sm"
-        >
-          {isLoading ? "Loading..." : "Refresh"}
-        </Button>
-      </Box>
-
-      {isLoading && !balance ? (
-        <Text as="p" size="sm" variant="secondary">
-          Loading prize pool balance...
-        </Text>
-      ) : balance ? (
-        <Box gap="sm" direction="column">
-          <Box gap="xs" direction="row" align="baseline" wrap="wrap">
-            <Text as="p" size="md" style={{ fontWeight: "bold" }}>
-              Current Balance:
+        {balance && (
+          <Box gap="xs" direction="row" align="baseline" wrap="nowrap">
+            <Text as="p" size="sm" style={{ margin: 0, color: "#6b7280" }}>
+              Balance:
             </Text>
-            <Text as="p" size="lg" style={{ fontWeight: "bold", color: "#00d4aa" }}>
+            <Text as="p" size="md" style={{ fontWeight: "bold", color: "#00d4aa", margin: 0 }}>
               {balance.xlm} XLM
             </Text>
           </Box>
-          <Text as="p" size="sm" variant="secondary">
-            <Code size="sm">{balance.stroops} stroops</Code>
-          </Text>
-        </Box>
-      ) : null}
-
-      <Box gap="sm" direction="column">
-        <Text as="h3" size="md">
-          Add Funds to Prize Pool
+        )}
+      </Box>
+      {isLoading && !balance && (
+        <Text as="p" size="xs" style={{ margin: 0, color: "#6b7280" }}>
+          Loading...
         </Text>
-        <Text as="p" size="sm" variant="secondary">
-          Enter an amount in XLM. Funds will be transferred from your connected wallet to the prize pool.
-        </Text>
-        
-        <Box gap="sm" direction="row" align="end" wrap="wrap">
+      )}
+      {address && (
+        <Box gap="sm" direction="row" align="end" wrap="nowrap">
           <Input
-            label="Amount"
+            label="Add Funds"
             id="add-funds-amount"
-            fieldSize="lg"
+            fieldSize="md"
             value={amount}
             onChange={(e) => {
               setAmount(e.target.value);
               setMessage(null);
             }}
-            placeholder="Enter amount (XLM or stroops)"
+            placeholder="Amount (XLM)"
             type="text"
-            style={{ flex: "1", minWidth: "200px" }}
+            style={{ width: "150px", flexShrink: 0 }}
           />
           <Button
             onClick={handleAddFunds}
             disabled={isAdding || !amount.trim()}
             variant="primary"
             size="md"
+            style={{ flexShrink: 0 }}
           >
-            {isAdding ? "Adding..." : "Add Funds"}
+            {isAdding ? "Adding..." : "Add"}
           </Button>
         </Box>
-      </Box>
-
+      )}
       {message && (
         <Text
           as="p"
-          size="sm"
+          size="xs"
           style={{
             color: message.type === "success" ? "#00d4aa" : "#ff3864",
-            marginTop: "8px",
+            margin: 0,
           }}
         >
           {message.text}

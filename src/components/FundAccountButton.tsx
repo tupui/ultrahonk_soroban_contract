@@ -71,4 +71,4 @@ const FundAccountButton: React.FC = () => {
   );
 };
 
-export default FundAccountButton;
+export { FundAccountButton as default };

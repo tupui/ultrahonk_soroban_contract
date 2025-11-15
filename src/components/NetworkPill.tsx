@@ -54,4 +54,4 @@ const NetworkPill: React.FC = () => {
   );
 };
 
-export default NetworkPill;
+export { NetworkPill as default };

@@ -3,7 +3,7 @@ import { Button, Text } from '@stellar/design-system';
 import { useWallet } from '../hooks/useWallet';
 import { generateRandomSudoku } from '../util/sudokuGenerator';
 import { NoirService } from '../services/NoirService';
-import { StellarContractService } from '../services/StellarContractService';
+import { contractClient, StellarContractService } from '../services/StellarContractService';
 import styles from './Sudoku.module.css';
 
 // Example puzzle data
@@ -22,7 +22,6 @@ export const Sudoku: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const cellRefs = useRef<(HTMLInputElement | null)[]>([]);
   const noirService = useRef(new NoirService());
-  const stellarService = useRef(new StellarContractService());
 
   // Initialize grid on mount
   useEffect(() => {
@@ -137,7 +136,7 @@ export const Sudoku: React.FC = () => {
     setSolution(EXAMPLE_SOLUTION);
     const preFilledCount = EXAMPLE_PUZZLE.filter(v => v > 0).length;
     setDifficulty(preFilledCount);
-    setOutput('✓ Example sudoku loaded. Base grid numbers are locked.');
+    setOutput('✓ Example sudoku loaded.');
   }, [clearGrid, setGivenCells]);
 
   const resetPuzzle = useCallback(() => {
@@ -353,29 +352,40 @@ Attempting to submit to smart contract to see contract-level validation...
         const proofBytes = new Uint8Array(440 * 32);
 
         // Build proof blob using helper method
-        const { proofBlob, proofId } = noirService.current.buildProofBlob(publicInputsBytes, proofBytes);
+        const { proofBlob } = noirService.current.buildProofBlob(publicInputsBytes, proofBytes);
 
         outputText += `\n\nSubmitting invalid proof to contract (properly formatted but with invalid proof data)...\n`;
 
-        const verificationResult = await stellarService.current.verifyProof(
-          vkJson,
-          proofBlob,
-          proofId,
-          walletSignTransaction,
-          address
-        );
+        try {
+          contractClient.options.publicKey = address;
+          const vkBuffer = StellarContractService.toBuffer(vkJson);
+          const proofBuffer = StellarContractService.toBuffer(proofBlob);
 
-        if (verificationResult.success) {
-          outputText += `\n⚠️ Unexpected: Contract accepted invalid proof!`;
-        } else {
+          const tx = await contractClient.verify_puzzle({
+            guesser: address,
+            vk_json: vkBuffer,
+            proof_blob: proofBuffer,
+          });
+
+          const result = await tx.signAndSend({ signTransaction: walletSignTransaction });
+          const txData = StellarContractService.extractTransactionData(result);
+
+          if (txData.success) {
+            outputText += `\n⚠️ Unexpected: Contract accepted invalid proof!`;
+          } else {
+            outputText += `\n\n✗ Contract Verification Failed (as expected)
+
+The smart contract also rejected the invalid proof, confirming that both client-side (Noir) and on-chain validation work correctly.`;
+          }
+        } catch (contractError: any) {
           outputText += `\n\n✗ Contract Verification Failed (as expected)
 
-Contract Error: ${verificationResult.error}
+Contract Error: ${contractError.message}
 
 The smart contract also rejected the invalid proof, confirming that both client-side (Noir) and on-chain validation work correctly.`;
         }
-      } catch (contractError: any) {
-        outputText += `\n\n✗ Failed to submit to contract: ${contractError.message}`;
+      } catch (error: any) {
+        outputText += `\n\n✗ Failed to submit to contract: ${error.message}`;
       }
     } else if (proofResult) {
       // Noir succeeded, proceed with normal flow
@@ -397,32 +407,42 @@ STELLAR VERIFICATION
 `.trim();
 
       // Verify on Stellar
-      const verificationResult = await stellarService.current.verifyProof(
-        proofResult.vkJson,
-        proofResult.proofBlob,
-        proofResult.proofId,
-        walletSignTransaction,
-        address
-      );
+      try {
+        contractClient.options.publicKey = address;
+        const vkBuffer = StellarContractService.toBuffer(proofResult.vkJson);
+        const proofBuffer = StellarContractService.toBuffer(proofResult.proofBlob);
 
-      if (verificationResult.success) {
-        outputText += `\n\n✓ Proof verified on Stellar!
+        const tx = await contractClient.verify_puzzle({
+          guesser: address,
+          vk_json: vkBuffer,
+          proof_blob: proofBuffer,
+        });
 
-Verification Status: ${verificationResult.isVerified ? '✓ VERIFIED' : '✗ NOT VERIFIED'}`;
+        const cpuInstructions = StellarContractService.extractCpuInstructions(tx);
+        const result = await tx.signAndSend({ signTransaction: walletSignTransaction });
+        const txData = StellarContractService.extractTransactionData(result);
 
-        if (verificationResult.txHash) {
-          outputText += `\nTransaction Hash: ${verificationResult.txHash}`;
+        if (txData.success) {
+          outputText += `\n\n✓ Proof verified on Stellar!
+
+Verification Status: ✓ VERIFIED`;
+
+          if (txData.txHash) {
+            outputText += `\nTransaction Hash: ${txData.txHash}`;
+          }
+          if (cpuInstructions) {
+            outputText += `\nCPU Instructions: ${cpuInstructions.toLocaleString()}`;
+          }
+          if (txData.fee) {
+            const stroops = parseInt(txData.fee);
+            const xlm = StellarContractService.formatStroopsToXlm(txData.fee);
+            outputText += `\nFee: ${stroops.toLocaleString()} stroops (${xlm} XLM)`;
+          }
+        } else {
+          outputText += `\n\n✗ Verification failed`;
         }
-        if (verificationResult.cpuInstructions) {
-          outputText += `\nCPU Instructions: ${verificationResult.cpuInstructions.toLocaleString()}`;
-        }
-        if (verificationResult.fee) {
-          const stroops = parseInt(verificationResult.fee);
-          const xlm = (stroops / 10_000_000).toFixed(7);
-          outputText += `\nFee: ${stroops.toLocaleString()} stroops (${xlm} XLM)`;
-        }
-      } else {
-        outputText += `\n\n✗ Verification failed: ${verificationResult.error}`;
+      } catch (error: any) {
+        outputText += `\n\n✗ Verification failed: ${error.message || String(error)}`;
       }
     }
 

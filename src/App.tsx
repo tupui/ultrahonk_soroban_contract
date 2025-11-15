@@ -22,7 +22,6 @@ const AppLayout: React.FC = () => (
                 <Button
                   variant="tertiary"
                   size="md"
-                  onClick={() => (window.location.href = "/debug")}
                   disabled={isActive}
                 >
                   <Icon.Code02 size="md" />

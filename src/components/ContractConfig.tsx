@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Button, Input, Text, Code } from "@stellar/design-system";
+import { Button, Input, Text } from "@stellar/design-system";
 import { Box } from "./layout/Box";
 import storage from "../util/storage";
+import { updateContractId } from "../contracts/guess_the_puzzle";
 
 const DEFAULT_CONTRACT_ID = 'CBXWA6DTDZTSOQ4LSUDW4XFUJSZK5MA5T5HEI5GD5ZJGW2OBEHTS4J4W';
 
@@ -39,7 +40,9 @@ export const ContractConfig = () => {
     try {
       // Store the contract ID
       storage.setItem('contractId', contractId);
-      setMessage({ type: "success", text: "Contract address updated successfully! Please refresh the page for changes to take effect." });
+      // Update the contract client with the new ID
+      updateContractId();
+      setMessage({ type: "success", text: "Contract address updated successfully!" });
       
       // Clear message after 5 seconds
       setTimeout(() => {
@@ -53,32 +56,35 @@ export const ContractConfig = () => {
   };
 
   return (
-    <Box gap="md" direction="column">
-      <Text as="h2" size="lg">
-        Contract Configuration
-      </Text>
-      <Text as="p" size="sm" variant="secondary">
-        Configure the contract address for the guess-the-puzzle contract. The contract ID must be 56 characters. Note: You may need to refresh the page after updating for changes to take effect.
-      </Text>
+    <Box gap="xs" direction="column">
+      <Box gap="xs" direction="row" align="baseline" wrap="wrap">
+        <Text as="h2" size="md" style={{ margin: 0 }}>
+          Contract Address
+        </Text>
+        <Text as="p" size="xs" style={{ margin: 0, color: "#6b7280" }}>
+          (56 chars)
+        </Text>
+      </Box>
       
-      <Box gap="sm" direction="row" align="end" wrap="wrap">
+      <Box gap="sm" direction="row" align="end" wrap="nowrap">
         <Input
-          label="Contract Address"
+          label=""
           id="contract-id"
-          fieldSize="lg"
+          fieldSize="md"
           value={contractId}
           onChange={(e) => {
             setContractId(e.target.value);
             setMessage(null);
           }}
-          placeholder="Enter 56-character contract ID"
-          style={{ flex: "1", minWidth: "300px" }}
+          placeholder="Enter contract ID"
+          style={{ width: "500px", fontFamily: "monospace", fontSize: "0.85rem", flexShrink: 0 }}
         />
         <Button
           onClick={handleUpdate}
           disabled={isUpdating || !contractId.trim()}
           variant="primary"
           size="md"
+          style={{ flexShrink: 0 }}
         >
           {isUpdating ? "Updating..." : "Update"}
         </Button>
@@ -87,22 +93,15 @@ export const ContractConfig = () => {
       {message && (
         <Text
           as="p"
-          size="sm"
+          size="xs"
           style={{
             color: message.type === "success" ? "#00d4aa" : "#ff3864",
-            marginTop: "8px",
+            margin: 0,
           }}
         >
           {message.text}
         </Text>
       )}
-
-      <Box gap="xs" direction="column">
-        <Text as="p" size="sm" variant="secondary">
-          Current Contract ID:
-        </Text>
-        <Code size="sm">{getContractId()}</Code>
-      </Box>
     </Box>
   );
 };
