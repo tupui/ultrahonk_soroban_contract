@@ -15,6 +15,7 @@ type Schema = {
   walletAddress: string;
   walletNetwork: string;
   networkPassphrase: string;
+  contractId: string;
 };
 
 /**

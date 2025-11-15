@@ -142,5 +142,117 @@ export class StellarContractService {
       };
     }
   }
+
+  /**
+   * Gets the current prize pool balance from the contract
+   * 
+   * @param address - Wallet address for setting publicKey on contract client
+   * @returns Prize pool balance in stroops and XLM format
+   */
+  async getPrizePot(address: string): Promise<{ stroops: string; xlm: string; success: boolean; error?: string }> {
+    try {
+      console.log('[StellarContractService] Calling prize_pot...');
+
+      game.options.publicKey = address;
+
+      // Call prize_pot (read-only function, get result from simulation)
+      const tx = await game.prize_pot();
+      
+      // For read-only functions, we can get the result from the simulation
+      const result = tx.result;
+      if (!result) {
+        throw new Error('No result from prize_pot simulation');
+      }
+
+      const stroops = result.toString();
+      const xlm = (parseInt(stroops) / 10_000_000).toFixed(7);
+
+      console.log('[StellarContractService] Prize pot:', stroops, 'stroops', `(${xlm} XLM)`);
+
+      return {
+        stroops,
+        xlm,
+        success: true,
+      };
+    } catch (error: any) {
+      console.error('[StellarContractService] Error getting prize pot:', error);
+      return {
+        stroops: '0',
+        xlm: '0.0000000',
+        success: false,
+        error: error.message || String(error),
+      };
+    }
+  }
+
+  /**
+   * Adds funds to the prize pool
+   * 
+   * This method:
+   * 1. Calls the add_funds contract method with the funder address and specified amount
+   * 2. Signs and submits the transaction using wallet
+   * 3. Returns transaction result
+   * 
+   * @param amount - Amount to add in stroops (i128)
+   * @param signTransaction - Wallet signTransaction function from useWallet hook
+   * @param address - Wallet address for the funder (who is adding the funds)
+   * @returns Transaction result including hash and fee
+   */
+  async addFunds(
+    amount: string,
+    signTransaction: (xdr: string) => Promise<{ signedTxXdr: string; signerAddress: string }>,
+    address: string
+  ): Promise<{ success: boolean; txHash?: string; fee?: string; error?: string }> {
+    try {
+      console.log('[StellarContractService] Calling add_funds...');
+      console.log(`[StellarContractService] Funder: ${address}`);
+      console.log(`[StellarContractService] Amount: ${amount} stroops`);
+
+      game.options.publicKey = address;
+
+      // Convert amount string to BigInt (stroops are i128)
+      const amountBigInt = BigInt(amount);
+
+      // Call add_funds with funder address
+      const tx = await game.add_funds({
+        funder: address,
+        amount: amountBigInt,
+      });
+
+      console.log('[StellarContractService] Transaction assembled, signing and sending...');
+
+      // Sign and send transaction using wallet
+      const result = await tx.signAndSend({
+        signTransaction,
+      });
+
+      console.log('[StellarContractService] Transaction sent');
+
+      // Get transaction hash from result
+      const txHash = (result as any).hash || '';
+
+      // Extract fee charged from transaction response
+      const txResponse = result.getTransactionResponse;
+      let fee: string | undefined;
+      if (txResponse && txResponse.status === 'SUCCESS') {
+        fee = txResponse.resultXdr.feeCharged().toString();
+        console.log('[StellarContractService] Fee charged:', fee, 'stroops');
+      }
+
+      console.log('[StellarContractService] add_funds succeeded');
+
+      return {
+        success: true,
+        txHash,
+        fee,
+      };
+    } catch (error: any) {
+      console.error('[StellarContractService] Error adding funds:', error);
+      return {
+        success: false,
+        error: error.message || String(error),
+      };
+    }
+  }
 }
 

@@ -74,13 +74,17 @@ impl GuessThePuzzle {
         proof_verified
     }
 
-    /// Admin can add more funds to the contract
-    pub fn add_funds(env: &Env, amount: i128) {
-        Self::require_admin(env);
+    pub fn prize_pot(env: &Env) -> i128 {
+        let xlm_client = xlm::token_client(&env);
         let contract_address = env.current_contract_address();
-        // unwrap here is safe because the admin was set in the constructor
-        let admin = Self::admin(env).unwrap();
-        xlm::token_client(env).transfer(&admin, &contract_address, &amount);
+        xlm_client.balance(&contract_address)
+    }
+
+    /// Add more funds to the contract, in XLM
+    pub fn add_funds(env: &Env, funder: Address, amount: u64) {
+        funder.require_auth();
+        let contract_address = env.current_contract_address();
+        xlm::token_client(env).transfer(&funder, &contract_address, &xlm::to_stroops(amount));
     }
 
     /// Upgrade the contract to new wasm. Only callable by admin.

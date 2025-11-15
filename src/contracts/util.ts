@@ -37,9 +37,13 @@ const stellarEncode = (str: string) => {
 };
 
 export const labPrefix = () => {
+  // For LOCAL network, always use localhost URLs
+  const localHorizonUrl = "http://localhost:8000";
+  const localRpcUrl = "http://localhost:8000/rpc";
+  
   switch (stellarNetwork) {
     case "LOCAL":
-      return `http://localhost:8000/lab/transaction-dashboard?$=network$id=custom&label=Custom&horizonUrl=${stellarEncode(horizonUrl)}&rpcUrl=${stellarEncode(rpcUrl)}&passphrase=${stellarEncode(networkPassphrase)};`;
+      return `http://localhost:8000/lab/transaction-dashboard?$=network$id=custom&label=Custom&horizonUrl=${stellarEncode(localHorizonUrl)}&rpcUrl=${stellarEncode(localRpcUrl)}&passphrase=${stellarEncode(networkPassphrase)};`;
     case "PUBLIC":
       return `https://lab.stellar.org/transaction-dashboard?$=network$id=mainnet&label=Mainnet&horizonUrl=${stellarEncode(horizonUrl)}&rpcUrl=${stellarEncode(rpcUrl)}&passphrase=${stellarEncode(networkPassphrase)};`;
     case "TESTNET":
@@ -52,9 +56,14 @@ export const labPrefix = () => {
 };
 
 // NOTE: needs to be exported for contract files in this directory
-export const rpcUrl = env.PUBLIC_STELLAR_RPC_URL;
+// Ensure localhost is used for LOCAL network, even if env vars point elsewhere
+export const rpcUrl = stellarNetwork === "LOCAL" 
+  ? "http://localhost:8000/rpc"
+  : env.PUBLIC_STELLAR_RPC_URL;
 
-export const horizonUrl = env.PUBLIC_STELLAR_HORIZON_URL;
+export const horizonUrl = stellarNetwork === "LOCAL"
+  ? "http://localhost:8000"
+  : env.PUBLIC_STELLAR_HORIZON_URL;
 
 const networkToId = (network: string): NetworkType => {
   switch (network) {

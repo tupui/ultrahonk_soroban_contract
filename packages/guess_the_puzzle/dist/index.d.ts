@@ -1,6 +1,6 @@
 import { Buffer } from "buffer";
 import { AssembledTransaction, Client as ContractClient, ClientOptions as ContractClientOptions, MethodOptions, Result } from '@stellar/stellar-sdk/contract';
-import type { i128, Option } from '@stellar/stellar-sdk/contract';
+import type { u64, i128, Option } from '@stellar/stellar-sdk/contract';
 export * from '@stellar/stellar-sdk';
 export * as contract from '@stellar/stellar-sdk/contract';
 export * as rpc from '@stellar/stellar-sdk/rpc';
@@ -73,11 +73,29 @@ export interface Client {
         simulate?: boolean;
     }) => Promise<AssembledTransaction<Result<Buffer>>>;
     /**
-     * Construct and simulate a add_funds transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-     * Admin can add more funds to the contract
+     * Construct and simulate a prize_pot transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
      */
-    add_funds: ({ amount }: {
-        amount: i128;
+    prize_pot: (options?: {
+        /**
+         * The fee to pay for the transaction. Default: BASE_FEE
+         */
+        fee?: number;
+        /**
+         * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+         */
+        timeoutInSeconds?: number;
+        /**
+         * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+         */
+        simulate?: boolean;
+    }) => Promise<AssembledTransaction<i128>>;
+    /**
+     * Construct and simulate a add_funds transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+     * Add more funds to the contract, in XLM
+     */
+    add_funds: ({ funder, amount }: {
+        funder: string;
+        amount: u64;
     }, options?: {
         /**
          * The fee to pay for the transaction. Default: BASE_FEE
@@ -189,6 +207,7 @@ export declare class Client extends ContractClient {
     readonly fromJSON: {
         set_puzzle: (json: string) => AssembledTransaction<null>;
         verify_puzzle: (json: string) => AssembledTransaction<Result<Buffer<ArrayBufferLike>, import("@stellar/stellar-sdk/contract").ErrorMessage>>;
+        prize_pot: (json: string) => AssembledTransaction<bigint>;
         add_funds: (json: string) => AssembledTransaction<null>;
         upgrade: (json: string) => AssembledTransaction<null>;
         puzzle: (json: string) => AssembledTransaction<Buffer<ArrayBufferLike>>;

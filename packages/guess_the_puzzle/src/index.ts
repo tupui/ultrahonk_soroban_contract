@@ -96,10 +96,30 @@ export interface Client {
   }) => Promise<AssembledTransaction<Result<Buffer>>>
 
   /**
-   * Construct and simulate a add_funds transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
-   * Admin can add more funds to the contract
+   * Construct and simulate a prize_pot transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
-  add_funds: ({amount}: {amount: i128}, options?: {
+  prize_pot: (options?: {
+    /**
+     * The fee to pay for the transaction. Default: BASE_FEE
+     */
+    fee?: number;
+
+    /**
+     * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
+     */
+    timeoutInSeconds?: number;
+
+    /**
+     * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
+     */
+    simulate?: boolean;
+  }) => Promise<AssembledTransaction<i128>>
+
+  /**
+   * Construct and simulate a add_funds transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   * Add more funds to the contract, in XLM
+   */
+  add_funds: ({funder, amount}: {funder: string, amount: u64}, options?: {
     /**
      * The fee to pay for the transaction. Default: BASE_FEE
      */
@@ -224,7 +244,8 @@ export class Client extends ContractClient {
         "AAAAAAAAAEhDb25zdHJ1Y3RvciB0byBpbml0aWFsaXplIHRoZSBjb250cmFjdCB3aXRoIGFuIGFkbWluIGFuZCBhIHJhbmRvbSBudW1iZXIAAAANX19jb25zdHJ1Y3RvcgAAAAAAAAEAAAAAAAAABWFkbWluAAAAAAAAEwAAAAA=",
         "AAAAAAAAAAAAAAAKc2V0X3B1enpsZQAAAAAAAQAAAAAAAAAGcHV6emxlAAAAAAAOAAAAAA==",
         "AAAAAAAAACVWZXJpZnkgdGhlIHB1enpsZSBpcyBjb3JyZWN0bHkgc29sdmVkAAAAAAAADXZlcmlmeV9wdXp6bGUAAAAAAAADAAAAAAAAAAdndWVzc2VyAAAAABMAAAAAAAAAB3ZrX2pzb24AAAAADgAAAAAAAAAKcHJvb2ZfYmxvYgAAAAAADgAAAAEAAAPpAAAD7gAAACAAAAAD",
-        "AAAAAAAAAChBZG1pbiBjYW4gYWRkIG1vcmUgZnVuZHMgdG8gdGhlIGNvbnRyYWN0AAAACWFkZF9mdW5kcwAAAAAAAAEAAAAAAAAABmFtb3VudAAAAAAACwAAAAA=",
+        "AAAAAAAAAAAAAAAJcHJpemVfcG90AAAAAAAAAAAAAAEAAAAL",
+        "AAAAAAAAACZBZGQgbW9yZSBmdW5kcyB0byB0aGUgY29udHJhY3QsIGluIFhMTQAAAAAACWFkZF9mdW5kcwAAAAAAAAIAAAAAAAAABmZ1bmRlcgAAAAAAEwAAAAAAAAAGYW1vdW50AAAAAAAGAAAAAA==",
         "AAAAAAAAADlVcGdyYWRlIHRoZSBjb250cmFjdCB0byBuZXcgd2FzbS4gT25seSBjYWxsYWJsZSBieSBhZG1pbi4AAAAAAAAHdXBncmFkZQAAAAABAAAAAAAAAA1uZXdfd2FzbV9oYXNoAAAAAAAD7gAAACAAAAAA",
         "AAAAAAAAACxSZWFkIG9ubHkgZnVuY3Rpb24gdG8gZ2V0IHRoZSBjdXJyZW50IG51bWJlcgAAAAZwdXp6bGUAAAAAAAAAAAABAAAADg==",
         "AAAAAAAAABFHZXQgY3VycmVudCBhZG1pbgAAAAAAAAVhZG1pbgAAAAAAAAAAAAABAAAD6AAAABM=",
@@ -235,6 +256,7 @@ export class Client extends ContractClient {
   public readonly fromJSON = {
     set_puzzle: this.txFromJSON<null>,
         verify_puzzle: this.txFromJSON<Result<Buffer>>,
+        prize_pot: this.txFromJSON<i128>,
         add_funds: this.txFromJSON<null>,
         upgrade: this.txFromJSON<null>,
         puzzle: this.txFromJSON<Buffer>,
