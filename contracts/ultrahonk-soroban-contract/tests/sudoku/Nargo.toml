@@ -1,0 +1,6 @@
+[package]
+name = "noir_sudoku"
+type = "bin"
+authors = [""]
+
+[dependencies]

@@ -1,28 +1,27 @@
-[package]
-name = "ultrahonk_soroban_contract"
-version = "0.1.0"
+[workspace]
+members = ["contracts/*"]
+resolver = "2"
+
+[workspace.package]
+authors = ["AhaLabs"]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/tupui/ultrahonk_soroban_contract"
+version = "1.0.0"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
-[dependencies]
-soroban-sdk = { version = "23.0.0-rc.3", default-features = false, features = ["alloc"] }
-ultrahonk_rust_verifier = { git = "https://github.com/yugocabrio/ultrahonk-rust-verifier.git", branch = "main", default-features = false }
-
-# 아래는 lib.rs에서 직접 사용하는 타입들을 위해 명시적으로 추가.
-ark-bn254 = { version = "0.5", default-features = false }
-ark-ff = { version = "0.5", default-features = false }
-sha3 = { version = "0.10", default-features = false }
-
-[dev-dependencies]
-# Enable test helpers for local unit tests
-soroban-sdk = { version = "23.0.0-rc.3", features = ["testutils"] }
-soroban-env-host = "23.0.0-rc.2"
+[workspace.dependencies.soroban-sdk]
+version = "23.1.0"
 
 [profile.release]
 opt-level = "z"
+debug = false
 lto = true
+debug-assertions = false
 codegen-units = 1
 panic = "abort"
+overflow-checks = true
 strip = true
+
+[profile.release-with-logs]
+debug-assertions = true
+inherits = "release"

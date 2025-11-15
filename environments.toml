@@ -1,0 +1,18 @@
+[development]
+accounts = ["default"]
+
+[development.network]
+rpc-url = "http://localhost:8000/rpc"
+network-passphrase = "Standalone Network ; February 2017"
+run-locally = true
+
+[development.contracts]
+
+[development.contracts.ultrahonk_soroban_contract]
+client = true
+
+[development.contracts.guess_the_puzzle]
+client = true
+constructor_args = """
+--admin default
+"""
