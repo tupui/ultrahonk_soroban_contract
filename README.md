@@ -73,3 +73,14 @@ https://github.com/jayz22/soroban-examples/tree/p25-preview/p25-preview
 On the contract itself, there is another problem. We are not checking the
 input puzzle and restrict the proof validation to a given puzzle. You can fix
 it!
+
+### Useful links
+
+Noir verifier: https://github.com/yugocabrio/ultrahonk-rust-verifier
+Risk0 verifier: https://github.com/NethermindEth/stellar-risc0-verifier
+
+Some games:
+
+https://github.com/kalepail/ultrahonk_soroban_contract/tree/zkp-maze__frontend
+https://github.com/kalepail/zkp-pong/tree/multi
+https://github.com/kalepail/zkp-maze
