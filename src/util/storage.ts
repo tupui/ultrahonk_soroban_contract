@@ -16,6 +16,7 @@ type Schema = {
   walletNetwork: string;
   networkPassphrase: string;
   contractId: string;
+  ultrahonkContractId: string;
   selectedNetwork: string;
 };
 

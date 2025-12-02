@@ -16,6 +16,11 @@ const Home: React.FC = () => {
           Solve Sudoku puzzles and generate zero-knowledge proofs that verify your solution
           on the Stellar blockchain using the UltraHonk proof system.
         </Text>
+
+        <Text as="p" size="md">
+          To validate the proof you either need to use a local node or select the NOIR network.
+          In your wallet, use the following RPC https://noir-local.stellar.buzz/soroban/rpc and Horizon URL https://noir-local.stellar.buzz
+        </Text>
         
         <Box gap="md" direction="column" style={{ marginTop: "2rem" }}>
           <ContractConfig />

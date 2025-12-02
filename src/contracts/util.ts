@@ -185,11 +185,19 @@ export const getGuessThePuzzleContractId = (skipStorage = false): string => {
 };
 
 /**
- * Get the ultrahonk_soroban_contract ID from environment variable.
- * This is required and should be set in the environment.
+ * Get the ultrahonk_soroban_contract ID.
+ * Priority: 1. Storage override (user input), 2. Environment variable, 3. Fallback value
+ * @param skipStorage - If true, skip storage check and return env var directly
  */
-export const getUltrahonkContractId = (): string => {
-  // Check both parsed env and import.meta.env as fallback
+export const getUltrahonkContractId = (skipStorage = false): string => {
+  if (!skipStorage) {
+    // First check storage for user override
+    const stored = storage.getItem('ultrahonkContractId', 'safe');
+    if (stored) {
+      return stored;
+    }
+  }
+  // Fall back to environment variable (check both parsed env and import.meta.env as fallback)
   const envContractId = env.PUBLIC_ULTRAHONK_CONTRACT_ID || import.meta.env.PUBLIC_ULTRAHONK_CONTRACT_ID;
   return envContractId || 'CCYFHQLAPB7CHBBE7QIN2QEBEBJPSGRJ2OJ4JPCHIN5IPKTVQ7YCR2CI';
 };
