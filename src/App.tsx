@@ -45,7 +45,14 @@ const AppLayout: React.FC = () => (
         >
           Apache License, Version 2.0
         </a>
-        .
+        .{" "}
+        <a
+          href="https://github.com/tupui/ultrahonk_soroban_contract"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          GitHub
+        </a>
       </span>
     </Layout.Footer>
   </main>
