@@ -4,7 +4,9 @@ This demo repository is leveraging Scaffold Stellar:
 
 http://scaffoldstellar.org
 
-It shows how to use the Noir Ultrahonk Stellar smart contract.
+It shows how to use the Noir Ultrahonk Stellar smart contract. Presented at NoirCon3!
+
+https://github.com/tupui/Academia/blob/main/Conf/NoirCon3.pdf
 
 The game is simple, after you solve a Sudoku grid, you can verify your solution
 and if it's valid generate a proof client side that you solved the problem.
