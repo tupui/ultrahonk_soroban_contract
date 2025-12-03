@@ -22,20 +22,31 @@ const FundAccountButton: React.FC = () => {
         if (response.ok) {
           addNotification("Account funded successfully!", "success");
         } else {
-          const body: unknown = await response.json();
-          if (
-            body !== null &&
-            typeof body === "object" &&
-            "detail" in body &&
-            typeof body.detail === "string"
-          ) {
-            addNotification(`Error funding account: ${body.detail}`, "error");
-          } else {
-            addNotification("Error funding account: Unknown error", "error");
+          // Try to parse error response
+          let errorMessage = `Error funding account: ${response.status} ${response.statusText}`;
+          try {
+            const body: unknown = await response.json();
+            if (
+              body !== null &&
+              typeof body === "object" &&
+              "detail" in body &&
+              typeof body.detail === "string"
+            ) {
+              errorMessage = `Error funding account: ${body.detail}`;
+            }
+          } catch {
+            // If JSON parsing fails, use the status message
+            if (response.status === 404) {
+              errorMessage = "Friendbot service not available. Make sure Stellar Quickstart is running on localhost:8000";
+            }
           }
+          addNotification(errorMessage, "error");
         }
-      } catch {
-        addNotification("Error funding account. Please try again.", "error");
+      } catch (error) {
+        const errorMessage = error instanceof Error 
+          ? `Error funding account: ${error.message}` 
+          : "Error funding account. Please try again.";
+        addNotification(errorMessage, "error");
       }
     });
   };

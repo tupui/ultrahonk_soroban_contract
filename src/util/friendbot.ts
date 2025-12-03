@@ -1,21 +1,21 @@
-import { stellarNetwork } from "../contracts/util";
+import { getSelectedNetwork, getNetworkUrls } from "../contracts/util";
 
 // Utility to get the correct Friendbot URL based on environment
 export function getFriendbotUrl(address: string) {
-  switch (stellarNetwork) {
-    case "LOCAL":
-      // Use proxy in development for local
-      return `/friendbot?addr=${address}`;
-    case "NOIR":
-      // NOIR network uses the same friendbot as LOCAL
-      return `/friendbot?addr=${address}`;
+  // Get the current network dynamically (checks localStorage for runtime selection)
+  const currentNetwork = getSelectedNetwork();
+  
+  switch (currentNetwork) {
     case "FUTURENET":
       return `https://friendbot-futurenet.stellar.org/?addr=${address}`;
     case "TESTNET":
       return `https://friendbot.stellar.org/?addr=${address}`;
+    case "LOCAL":
+    case "NOIR":
     default:
-      throw new Error(
-        `Unknown or unsupported PUBLIC_STELLAR_NETWORK for friendbot: ${stellarNetwork}`,
-      );
+      // For LOCAL, NOIR, and other custom networks, use the Horizon URL + /friendbot
+      // This ensures LOCAL uses explicit localhost:8000 URL (not relative path)
+      const { horizonUrl } = getNetworkUrls();
+      return `${horizonUrl}/friendbot?addr=${address}`;
   }
 }

@@ -42,12 +42,6 @@ export default defineConfig(() => {
         "Cross-Origin-Embedder-Policy": "credentialless",
         "Cross-Origin-Opener-Policy": "same-origin",
       },
-      proxy: {
-        "/friendbot": {
-          target: "http://localhost:8000/friendbot",
-          changeOrigin: true,
-        },
-      },
     },
   };
 });

@@ -32,7 +32,7 @@ const env: z.infer<typeof envSchema> = parsed.success
     };
 
 // Check localStorage for runtime-selected network first, fall back to env var
-const getSelectedNetwork = (): string => {
+export const getSelectedNetwork = (): string => {
   const selected = storage.getItem("selectedNetwork");
   if (selected) {
     return selected;
