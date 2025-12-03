@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Button, Text } from '@stellar/design-system';
+import { Button } from '@stellar/design-system';
 import { useWallet } from '../hooks/useWallet';
 import { useWalletBalance } from '../hooks/useWalletBalance';
 import { usePrizePool } from '../contexts/PrizePoolContext';
