@@ -480,14 +480,6 @@ Verification Status: ✓ VERIFIED`;
     setIsGenerating(false);
   }, [address, signTransaction, collectSudokuGridData, loadPrizePot, updateBalance]);
 
-  if (!address) {
-    return (
-      <Text as="p" size="md">
-        Connect wallet to play Sudoku and generate proofs
-      </Text>
-    );
-  }
-
   return (
     <div>
       {/* Difficulty slider */}
@@ -544,9 +536,9 @@ Verification Status: ✓ VERIFIED`;
           onClick={generateProof}
           variant="primary"
           size="md"
-          disabled={isGenerating}
+          disabled={!address || isGenerating}
         >
-          {isGenerating ? 'Generating...' : 'Generate Proof'}
+          {!address ? 'Connect Wallet First' : (isGenerating ? 'Generating...' : 'Generate Proof')}
         </Button>
       </div>
 
