@@ -1,5 +1,5 @@
 import { Buffer } from "buffer";
-import { Address } from '@stellar/stellar-sdk';
+import { Address } from "@stellar/stellar-sdk";
 import {
   AssembledTransaction,
   Client as ContractClient,
@@ -7,7 +7,7 @@ import {
   MethodOptions,
   Result,
   Spec as ContractSpec,
-} from '@stellar/stellar-sdk/contract';
+} from "@stellar/stellar-sdk/contract";
 import type {
   u32,
   i32,
@@ -18,25 +18,20 @@ import type {
   u256,
   i256,
   Option,
-  Typepoint,
+  Timepoint,
   Duration,
-} from '@stellar/stellar-sdk/contract';
-export * from '@stellar/stellar-sdk'
-export * as contract from '@stellar/stellar-sdk/contract'
-export * as rpc from '@stellar/stellar-sdk/rpc'
+} from "@stellar/stellar-sdk/contract";
+export * from "@stellar/stellar-sdk";
+export * as contract from "@stellar/stellar-sdk/contract";
+export * as rpc from "@stellar/stellar-sdk/rpc";
 
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   //@ts-ignore Buffer exists
   window.Buffer = window.Buffer || Buffer;
 }
 
 
-export const networks = {
-  standalone: {
-    networkPassphrase: "Standalone Network ; February 2017",
-    contractId: "CCYFHQLAPB7CHBBE7QIN2QEBEBJPSGRJ2OJ4JPCHIN5IPKTVQ7YCR2CI",
-  }
-} as const
+
 
 export const Errors = {
   1: {message:"VkParseError"},
@@ -50,85 +45,25 @@ export interface Client {
    * Construct and simulate a verify_proof transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Verify an UltraHonk proof; on success store proof_id (= keccak256(proof_blob))
    */
-  verify_proof: ({vk_json, proof_blob}: {vk_json: Buffer, proof_blob: Buffer}, options?: {
-    /**
-     * The fee to pay for the transaction. Default: BASE_FEE
-     */
-    fee?: number;
-
-    /**
-     * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-     */
-    timeoutInSeconds?: number;
-
-    /**
-     * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-     */
-    simulate?: boolean;
-  }) => Promise<AssembledTransaction<Result<Buffer>>>
+  verify_proof: ({vk_json, proof_blob}: {vk_json: Buffer, proof_blob: Buffer}, options?: MethodOptions) => Promise<AssembledTransaction<Result<Buffer>>>
 
   /**
    * Construct and simulate a set_vk transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Set verification key JSON and cache its hash. Returns vk_hash
    */
-  set_vk: ({vk_json}: {vk_json: Buffer}, options?: {
-    /**
-     * The fee to pay for the transaction. Default: BASE_FEE
-     */
-    fee?: number;
-
-    /**
-     * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-     */
-    timeoutInSeconds?: number;
-
-    /**
-     * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-     */
-    simulate?: boolean;
-  }) => Promise<AssembledTransaction<Result<Buffer>>>
+  set_vk: ({vk_json}: {vk_json: Buffer}, options?: MethodOptions) => Promise<AssembledTransaction<Result<Buffer>>>
 
   /**
    * Construct and simulate a verify_proof_with_stored_vk transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Verify using the on-chain stored VK
    */
-  verify_proof_with_stored_vk: ({proof_blob}: {proof_blob: Buffer}, options?: {
-    /**
-     * The fee to pay for the transaction. Default: BASE_FEE
-     */
-    fee?: number;
-
-    /**
-     * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-     */
-    timeoutInSeconds?: number;
-
-    /**
-     * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-     */
-    simulate?: boolean;
-  }) => Promise<AssembledTransaction<Result<Buffer>>>
+  verify_proof_with_stored_vk: ({proof_blob}: {proof_blob: Buffer}, options?: MethodOptions) => Promise<AssembledTransaction<Result<Buffer>>>
 
   /**
    * Construct and simulate a is_verified transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * Query if a proof_id was previously verified
    */
-  is_verified: ({proof_id}: {proof_id: Buffer}, options?: {
-    /**
-     * The fee to pay for the transaction. Default: BASE_FEE
-     */
-    fee?: number;
-
-    /**
-     * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-     */
-    timeoutInSeconds?: number;
-
-    /**
-     * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-     */
-    simulate?: boolean;
-  }) => Promise<AssembledTransaction<boolean>>
+  is_verified: ({proof_id}: {proof_id: Buffer}, options?: MethodOptions) => Promise<AssembledTransaction<boolean>>
 
 }
 export class Client extends ContractClient {

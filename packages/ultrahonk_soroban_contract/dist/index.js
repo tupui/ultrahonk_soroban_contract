@@ -1,18 +1,12 @@
 import { Buffer } from "buffer";
-import { Client as ContractClient, Spec as ContractSpec, } from '@stellar/stellar-sdk/contract';
-export * from '@stellar/stellar-sdk';
-export * as contract from '@stellar/stellar-sdk/contract';
-export * as rpc from '@stellar/stellar-sdk/rpc';
-if (typeof window !== 'undefined') {
+import { Client as ContractClient, Spec as ContractSpec, } from "@stellar/stellar-sdk/contract";
+export * from "@stellar/stellar-sdk";
+export * as contract from "@stellar/stellar-sdk/contract";
+export * as rpc from "@stellar/stellar-sdk/rpc";
+if (typeof window !== "undefined") {
     //@ts-ignore Buffer exists
     window.Buffer = window.Buffer || Buffer;
 }
-export const networks = {
-    standalone: {
-        networkPassphrase: "Standalone Network ; February 2017",
-        contractId: "CAXMCB6EYJ6Z6PHHC3MZ54IKHAZV5WSM2OAK4DSGM2E2M6DJG4FX5CPB",
-    }
-};
 export const Errors = {
     1: { message: "VkParseError" },
     2: { message: "ProofParseError" },

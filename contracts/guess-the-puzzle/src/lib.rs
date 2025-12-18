@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Bytes, BytesN, Env, Symbol};
+use soroban_sdk::{contract, contractimpl, symbol_short, token, Address, Bytes, BytesN, Env, Symbol};
 
 
 mod ultrahonk_contract {
@@ -7,7 +7,6 @@ mod ultrahonk_contract {
 }
 
 mod error;
-mod xlm;
 
 use error::Error;
 
@@ -17,7 +16,8 @@ pub struct GuessThePuzzle;
 pub const THE_PUZZLE: &Symbol = &symbol_short!("n");
 pub const ADMIN_KEY: &Symbol = &symbol_short!("ADMIN");
 
-pub const ULTRAHONK_CONTRACT_ADDRESS: &str = "CCYFHQLAPB7CHBBE7QIN2QEBEBJPSGRJ2OJ4JPCHIN5IPKTVQ7YCR2CI";
+pub const ULTRAHONK_CONTRACT_ADDRESS: &str = "CBJR2EC4CW5TEDOZE7VQITPP3JWIR6J3C77ZR7KDDZLQQJ4RPHWB5EQI";
+pub const XLM_CONTRACT_ADDRESS: &str = "CB64D3G7SM2RTH6JSGG34DDTFTQ5CFDKVDZJZSODMCX4NJ2HV2KN7OHT";
 
 
 #[contractimpl]
@@ -26,14 +26,15 @@ impl GuessThePuzzle {
     pub fn __constructor(env: &Env, admin: Address) {
         // Require auth from the admin to make the transfer
         admin.require_auth();
-        // This is for testing purposes. Ensures that the XLM contract set up for unit testing and local network
-        xlm::register(env, &admin);
-        // Send the contract an amount of XLM to play with
-        xlm::token_client(env).transfer(
+
+        let sac_contract = Address::from_str(&env, XLM_CONTRACT_ADDRESS);
+        let xlm_client = token::StellarAssetClient::new(&env, &sac_contract);
+        xlm_client.transfer(
             &admin,
             env.current_contract_address(),
-            &xlm::to_stroops(10),
+            (&(10 * 10_000_000)).into()
         );
+
         // Set the admin in storage
         Self::set_admin(env, admin);
     }
@@ -45,23 +46,24 @@ impl GuessThePuzzle {
     }
 
     /// Verify the puzzle is correctly solved
-    pub fn verify_puzzle(env: Env, guesser: Address, vk_json: Bytes, proof_blob: Bytes) -> Result<BytesN<32>, Error> {
+    pub fn verify_puzzle(env: Env, guesser: Address, vk_json: Bytes, public_inputs: Bytes, proof_blob: Bytes) -> Result<bool, Error> {
         // take a fee before doing anything and starting any validation
         guesser.require_auth();
-        let xlm_client = xlm::token_client(&env);
+        let sac_contract = Address::from_str(&env, XLM_CONTRACT_ADDRESS);
+        let xlm_client = token::StellarAssetClient::new(&env, &sac_contract);
         let contract_address = env.current_contract_address();
         // Methods `try_*` will return an error if the method fails
         // `.map_err` lets us convert the error to our custom Error type
         let _ = xlm_client
-                .try_transfer(&guesser, &contract_address, &xlm::to_stroops(1))
+                .try_transfer(&guesser, &contract_address, (&(1 * 10_000_000)).into())
                 .map_err(|_| Error::FailedToTransferFromGuesser)?;
 
         // proof validation itself
         let ultrahonk_contract_address = Address::from_str(&env, ULTRAHONK_CONTRACT_ADDRESS);
         let ultrahonk_client = ultrahonk_contract::Client::new(&env, &ultrahonk_contract_address);
 
-        match ultrahonk_client.try_verify_proof(&vk_json, &proof_blob) {
-            Ok(Ok(result)) => {
+        match ultrahonk_client.try_verify_proof(&vk_json, &public_inputs, &proof_blob) {
+            Ok(Ok(())) => {
                 let balance = xlm_client.balance(&contract_address);
                 if balance == 0 {
                     return Err(Error::NoBalanceToTransfer);
@@ -69,14 +71,15 @@ impl GuessThePuzzle {
                 let _ = xlm_client
                     .try_transfer(&contract_address, &guesser, &balance)
                     .map_err(|_| Error::FailedToTransferToGuesser)?;
-                Ok(result)
+                Ok(true)
             },
-            _ => Ok(BytesN::from_array(&env, &[0; 32])),
+            _ => Ok(false),
         }
     }
 
     pub fn prize_pot(env: &Env) -> i128 {
-        let xlm_client = xlm::token_client(&env);
+        let sac_contract = Address::from_str(&env, XLM_CONTRACT_ADDRESS);
+        let xlm_client = token::StellarAssetClient::new(&env, &sac_contract);
         let contract_address = env.current_contract_address();
         xlm_client.balance(&contract_address)
     }
@@ -85,7 +88,10 @@ impl GuessThePuzzle {
     pub fn add_funds(env: &Env, funder: Address, amount: u64) {
         funder.require_auth();
         let contract_address = env.current_contract_address();
-        xlm::token_client(env).transfer(&funder, &contract_address, &xlm::to_stroops(amount));
+        let sac_contract = Address::from_str(&env, XLM_CONTRACT_ADDRESS);
+        let xlm_client = token::StellarAssetClient::new(&env, &sac_contract);
+        let amount_: i128 = (amount * 10_000_000) as i128;
+        xlm_client.transfer(&funder, &contract_address,  &amount_);
     }
 
     /// Upgrade the contract to new wasm. Only callable by admin.

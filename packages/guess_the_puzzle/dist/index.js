@@ -1,18 +1,12 @@
 import { Buffer } from "buffer";
-import { Client as ContractClient, Spec as ContractSpec, } from '@stellar/stellar-sdk/contract';
-export * from '@stellar/stellar-sdk';
-export * as contract from '@stellar/stellar-sdk/contract';
-export * as rpc from '@stellar/stellar-sdk/rpc';
-if (typeof window !== 'undefined') {
+import { Client as ContractClient, Spec as ContractSpec, } from "@stellar/stellar-sdk/contract";
+export * from "@stellar/stellar-sdk";
+export * as contract from "@stellar/stellar-sdk/contract";
+export * as rpc from "@stellar/stellar-sdk/rpc";
+if (typeof window !== "undefined") {
     //@ts-ignore Buffer exists
     window.Buffer = window.Buffer || Buffer;
 }
-export const networks = {
-    standalone: {
-        networkPassphrase: "Standalone Network ; February 2017",
-        contractId: "CBXWA6DTDZTSOQ4LSUDW4XFUJSZK5MA5T5HEI5GD5ZJGW2OBEHTS4J4W",
-    }
-};
 export const Errors = {
     /**
      * The contract failed to transfer XLM to the guesser
@@ -40,7 +34,7 @@ export class Client extends ContractClient {
         super(new ContractSpec(["AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAAwAAADJUaGUgY29udHJhY3QgZmFpbGVkIHRvIHRyYW5zZmVyIFhMTSB0byB0aGUgZ3Vlc3NlcgAAAAAAGUZhaWxlZFRvVHJhbnNmZXJUb0d1ZXNzZXIAAAAAAAABAAAAMlRoZSBndWVzc2VyIGZhaWxlZCB0byB0cmFuc2ZlciBYTE0gdG8gdGhlIGNvbnRyYWN0AAAAAAAbRmFpbGVkVG9UcmFuc2ZlckZyb21HdWVzc2VyAAAAAAIAAAA2VGhlIGNvbnRyYWN0IGhhcyBubyBiYWxhbmNlIHRvIHRyYW5zZmVyIHRvIHRoZSBndWVzc2VyAAAAAAATTm9CYWxhbmNlVG9UcmFuc2ZlcgAAAAAD",
             "AAAAAAAAAEhDb25zdHJ1Y3RvciB0byBpbml0aWFsaXplIHRoZSBjb250cmFjdCB3aXRoIGFuIGFkbWluIGFuZCBhIHJhbmRvbSBudW1iZXIAAAANX19jb25zdHJ1Y3RvcgAAAAAAAAEAAAAAAAAABWFkbWluAAAAAAAAEwAAAAA=",
             "AAAAAAAAAAAAAAAKc2V0X3B1enpsZQAAAAAAAQAAAAAAAAAGcHV6emxlAAAAAAAOAAAAAA==",
-            "AAAAAAAAACVWZXJpZnkgdGhlIHB1enpsZSBpcyBjb3JyZWN0bHkgc29sdmVkAAAAAAAADXZlcmlmeV9wdXp6bGUAAAAAAAADAAAAAAAAAAdndWVzc2VyAAAAABMAAAAAAAAAB3ZrX2pzb24AAAAADgAAAAAAAAAKcHJvb2ZfYmxvYgAAAAAADgAAAAEAAAPpAAAD7gAAACAAAAAD",
+            "AAAAAAAAACVWZXJpZnkgdGhlIHB1enpsZSBpcyBjb3JyZWN0bHkgc29sdmVkAAAAAAAADXZlcmlmeV9wdXp6bGUAAAAAAAAEAAAAAAAAAAdndWVzc2VyAAAAABMAAAAAAAAAB3ZrX2pzb24AAAAADgAAAAAAAAANcHVibGljX2lucHV0cwAAAAAAAA4AAAAAAAAACnByb29mX2Jsb2IAAAAAAA4AAAABAAAD6QAAAAEAAAAD",
             "AAAAAAAAAAAAAAAJcHJpemVfcG90AAAAAAAAAAAAAAEAAAAL",
             "AAAAAAAAACZBZGQgbW9yZSBmdW5kcyB0byB0aGUgY29udHJhY3QsIGluIFhMTQAAAAAACWFkZF9mdW5kcwAAAAAAAAIAAAAAAAAABmZ1bmRlcgAAAAAAEwAAAAAAAAAGYW1vdW50AAAAAAAGAAAAAA==",
             "AAAAAAAAADlVcGdyYWRlIHRoZSBjb250cmFjdCB0byBuZXcgd2FzbS4gT25seSBjYWxsYWJsZSBieSBhZG1pbi4AAAAAAAAHdXBncmFkZQAAAAABAAAAAAAAAA1uZXdfd2FzbV9oYXNoAAAAAAAD7gAAACAAAAAA",
