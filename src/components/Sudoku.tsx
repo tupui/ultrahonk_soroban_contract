@@ -6,8 +6,6 @@ import { usePrizePool } from '../contexts/PrizePoolContext';
 import { generateRandomSudoku } from '../util/sudokuGenerator';
 import { NoirService } from '../services/NoirService';
 import { getContractClient, StellarContractService } from '../services/StellarContractService';
-import { SorobanRpc } from '@stellar/stellar-sdk';
-import { rpcUrl } from '../contracts/util';
 import styles from './Sudoku.module.css';
 
 // Example puzzle data
@@ -28,6 +26,7 @@ export const Sudoku: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const cellRefs = useRef<(HTMLInputElement | null)[]>([]);
   const noirService = useRef(new NoirService());
+
 
   // Initialize grid on mount
   useEffect(() => {
@@ -357,8 +356,8 @@ Attempting to submit to smart contract to see contract-level validation...
         // Use standard proof size: 440 fields * 32 bytes
         const proofBytes = new Uint8Array(440 * 32);
 
-        // Build proof blob using helper method
-        const { proofBlob } = noirService.current.buildProofBlob(publicInputsBytes, proofBytes);
+        // Build proof blob (not used in this test)
+        noirService.current.buildProofBlob(publicInputsBytes, proofBytes);
 
         outputText += `\n\nSubmitting invalid proof to contract (properly formatted but with invalid proof data)...\n`;
 
@@ -366,8 +365,20 @@ Attempting to submit to smart contract to see contract-level validation...
           const contractClient = getContractClient();
           contractClient.options.publicKey = address;
           const vkBuffer = StellarContractService.toBuffer(vkJson);
-          const proofBuffer = StellarContractService.toBuffer(proofBlob);
+          // Send raw proof bytes
+          const proofBuffer = StellarContractService.toBuffer(proofBytes);
+          // Send the properly encoded public inputs
           const publicInputsBuffer = StellarContractService.toBuffer(publicInputsBytes);
+
+          console.log('=== CONTRACT CALL DEBUG (INVALID PROOF) ===');
+          console.log('Contract ID:', getGuessThePuzzleContractId());
+          console.log('Guesser address:', address);
+          console.log('VK buffer length:', vkBuffer.length, 'bytes');
+          console.log('Public inputs buffer length:', publicInputsBuffer.length, 'bytes');
+          console.log('Proof buffer length:', proofBuffer.length, 'bytes');
+          console.log('VK buffer first 32 bytes:', Array.from(vkBuffer.slice(0, 32)));
+          console.log('Public inputs first 32 bytes:', Array.from(publicInputsBuffer.slice(0, 32)));
+          console.log('Proof first 32 bytes:', Array.from(proofBuffer.slice(0, 32)));
 
           const tx = await contractClient.verify_puzzle({
             guesser: address,
@@ -376,13 +387,15 @@ Attempting to submit to smart contract to see contract-level validation...
             proof_blob: proofBuffer,
           });
 
+        // The transaction always succeeds - we need to check both return value and contract errors
           const result = await tx.signAndSend({ signTransaction: walletSignTransaction });
-          const txData = StellarContractService.extractTransactionData(result);
+        const txData = StellarContractService.extractTransactionData(result);
 
-          // Wait a bit for transaction to be processed, then get the return value
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          const server = new SorobanRpc.Server(rpcUrl, { allowHttp: true });
-          const returnValue = await StellarContractService.extractReturnValue(server, txData.txHash!);
+          // Always log transaction ID
+          if (txData.txHash) {
+            console.log(`Transaction ID: ${txData.txHash}`);
+            outputText += `\nTransaction ID: ${txData.txHash}`;
+          }
 
           // Refresh prize pool and wallet balance after verification attempt
           setTimeout(() => {
@@ -390,25 +403,110 @@ Attempting to submit to smart contract to see contract-level validation...
             updateBalance();
           }, 2000);
 
-          if (returnValue === false) {
-            outputText += `\n\n✓ Contract Verification Failed (as expected)
+        // Check for contract errors in the transaction result
+        // Soroban contract errors are encoded in the result, not thrown as exceptions
+        let contractError: number | null = null;
+        let contractErrorDetails: any = null;
 
-The smart contract also rejected the invalid proof, confirming that both client-side (Noir) and on-chain validation work correctly.`;
-          } else {
-            outputText += `\n⚠️ Unexpected: Contract accepted invalid proof!`;
+        // Try different ways to extract contract errors
+        if (result.resultXdr) {
+          try {
+            // Check if resultXdr has contract error information
+            if (typeof result.resultXdr.contractError === 'function') {
+              const error = result.resultXdr.contractError();
+              if (error) {
+                contractError = error;
+                console.log('Contract error code (invalid proof):', contractError);
+              }
+            } else if (result.resultXdr._value && result.resultXdr._value._attributes) {
+              // Try accessing error through internal structure
+              const attrs = result.resultXdr._value._attributes;
+              if (attrs.error && attrs.error._value) {
+                contractError = attrs.error._value;
+                console.log('Contract error code (invalid proof alt):', contractError);
+              }
+            }
+
+            // Log the full resultXdr for debugging
+            console.log('Full resultXdr (invalid proof):', JSON.stringify(result.resultXdr, null, 2));
+          } catch (e) {
+            console.log('Error extracting contract error (invalid proof):', e);
           }
+        }
+
+        // Also check if the result itself indicates an error
+        if (contractError === null && result.error) {
+          console.log('Transaction result error (invalid proof):', result.error);
+          contractErrorDetails = result.error;
+          // Try to extract error code from error object
+          if (typeof result.error === 'number') {
+            contractError = result.error;
+          } else if (result.error.code) {
+            contractError = result.error.code;
+          }
+        }
+
+        // Log additional transaction details for debugging
+        console.log('Transaction details (invalid proof):', {
+          hash: txData.txHash,
+          fee: txData.fee,
+          success: txData.success,
+          contractError,
+          contractErrorDetails,
+          resultType: typeof result.result,
+          resultValue: result.result
+        });
+
+        // Check the return value - should be false for invalid proof
+        let verificationResult = result.result; // This is the Soroban result wrapper
+
+        // Handle Soroban result wrapper - extract the actual boolean value
+        if (verificationResult && typeof verificationResult === 'object' && 'value' in verificationResult) {
+          verificationResult = verificationResult.value; // Extract the boolean from Ok2 wrapper
+          console.log('Extracted verification result (invalid proof):', verificationResult);
+        } else if (verificationResult === undefined && result.resultXdr) {
+          // Fallback: try to decode from resultXdr
+          try {
+            const returnValue = result.resultXdr.returnValue();
+            verificationResult = returnValue === true || returnValue === 1;
+            console.log('Decoded return value (invalid proof):', returnValue, 'Verification result:', verificationResult);
+          } catch (e) {
+            console.log('Could not decode return value (invalid proof):', e);
+          }
+        }
+
+        if (contractError !== null) {
+          // Contract returned an error during invalid proof test
+          outputText += `\n\n⚠ Unexpected contract error during invalid proof test.
+
+Contract returned error ${contractError} instead of rejecting the invalid proof cleanly.`;
+        } else if (verificationResult === false) {
+          outputText += `\n\n✓ Invalid proof correctly rejected by contract!
+
+The smart contract properly rejected the invalid proof, confirming that both client-side (Noir) and on-chain validation work correctly.`;
+        } else {
+          outputText += `\n\n⚠ Unexpected result from invalid proof test.
+
+Expected the contract to return false for an invalid proof, but got: ${verificationResult}. This may indicate an issue with the contract logic.`;
+        }
+
+        if (txData.fee) {
+          const stroops = parseInt(txData.fee);
+          const xlm = StellarContractService.formatStroopsToXlm(txData.fee);
+          outputText += `\nFee: ${stroops.toLocaleString()} stroops (${xlm} XLM)`;
+        }
         } catch (contractError: any) {
+          console.error('Contract error during invalid proof test:', contractError);
+
           // Refresh prize pool and wallet balance after verification attempt (even on error)
           setTimeout(() => {
             loadPrizePot();
             updateBalance();
           }, 2000);
 
-          outputText += `\n\n✗ Contract Verification Failed (as expected)
+          outputText += `\n\n✗ Unexpected error during invalid proof test: ${contractError.message}
 
-Contract Error: ${contractError.message}
-
-The smart contract also rejected the invalid proof, confirming that both client-side (Noir) and on-chain validation work correctly.`;
+This error occurred before the transaction was submitted, possibly during transaction preparation.`;
         }
       } catch (error: any) {
         outputText += `\n\n✗ Failed to submit to contract: ${error.message}`;
@@ -437,7 +535,9 @@ STELLAR VERIFICATION
         const contractClient = getContractClient();
         contractClient.options.publicKey = address;
         const vkBuffer = StellarContractService.toBuffer(proofResult.vkJson);
-        const proofBuffer = StellarContractService.toBuffer(proofResult.proofBlob);
+        // Send raw proof bytes
+        const proofBuffer = StellarContractService.toBuffer(proofResult.proof);
+        // Send the properly encoded public inputs
         const publicInputsBuffer = StellarContractService.toBuffer(proofResult.publicInputs);
 
         const tx = await contractClient.verify_puzzle({
@@ -448,13 +548,16 @@ STELLAR VERIFICATION
         });
 
         const cpuInstructions = StellarContractService.extractCpuInstructions(tx);
+
+        // The transaction always succeeds - we need to check both return value and contract errors
         const result = await tx.signAndSend({ signTransaction: walletSignTransaction });
         const txData = StellarContractService.extractTransactionData(result);
 
-        // Wait a bit for transaction to be processed, then get the return value
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        const server = new SorobanRpc.Server(rpcUrl, { allowHttp: true });
-        const returnValue = await StellarContractService.extractReturnValue(server, txData.txHash!);
+        // Always log transaction ID
+        if (txData.txHash) {
+          console.log(`Transaction ID: ${txData.txHash}`);
+          outputText += `\nTransaction ID: ${txData.txHash}`;
+        }
 
         // Refresh prize pool and wallet balance after verification attempt
         setTimeout(() => {
@@ -462,27 +565,115 @@ STELLAR VERIFICATION
           updateBalance();
         }, 2000);
 
-        if (returnValue === true) {
-          outputText += `\n\n✓ Proof verified on Stellar!
+        // Check for contract errors in the transaction result
+        // Soroban contract errors are encoded in the result, not thrown as exceptions
+        let contractError: number | null = null;
+        let contractErrorDetails: any = null;
 
-Verification Status: ✓ VERIFIED
-Prize claimed successfully!`;
+        // Try different ways to extract contract errors
+        if (result.resultXdr) {
+          try {
+            // Check if resultXdr has contract error information
+            if (typeof result.resultXdr.contractError === 'function') {
+              const error = result.resultXdr.contractError();
+              if (error) {
+                contractError = error;
+                console.log('Contract error code:', contractError);
+              }
+            } else if (result.resultXdr._value && result.resultXdr._value._attributes) {
+              // Try accessing error through internal structure
+              const attrs = result.resultXdr._value._attributes;
+              if (attrs.error && attrs.error._value) {
+                contractError = attrs.error._value;
+                console.log('Contract error code (alt):', contractError);
+              }
+            }
 
-          if (txData.txHash) {
-            outputText += `\nTransaction Hash: ${txData.txHash}`;
+            // Log the full resultXdr for debugging
+            console.log('Full resultXdr:', JSON.stringify(result.resultXdr, null, 2));
+          } catch (e) {
+            console.log('Error extracting contract error:', e);
           }
-          if (cpuInstructions) {
-            outputText += `\nCPU Instructions: ${cpuInstructions.toLocaleString()}`;
+        }
+
+        // Also check if the result itself indicates an error
+        if (contractError === null && result.error) {
+          console.log('Transaction result error:', result.error);
+          contractErrorDetails = result.error;
+          // Try to extract error code from error object
+          if (typeof result.error === 'number') {
+            contractError = result.error;
+          } else if (result.error.code) {
+            contractError = result.error.code;
           }
-          if (txData.fee) {
-            const stroops = parseInt(txData.fee);
-            const xlm = StellarContractService.formatStroopsToXlm(txData.fee);
-            outputText += `\nFee: ${stroops.toLocaleString()} stroops (${xlm} XLM)`;
+        }
+
+        // Log additional transaction details for debugging
+        console.log('Transaction details:', {
+          hash: txData.txHash,
+          fee: txData.fee,
+          success: txData.success,
+          contractError,
+          contractErrorDetails,
+          resultType: typeof result.result,
+          resultValue: result.result
+        });
+
+        // Check the return value - true means verification succeeded and prize was paid
+        // false means proof was invalid but user paid the 1 XLM fee
+        let verificationResult = result.result; // This is the Soroban result wrapper
+
+        // Handle Soroban result wrapper - extract the actual boolean value
+        if (verificationResult && typeof verificationResult === 'object' && 'value' in verificationResult) {
+          verificationResult = verificationResult.value; // Extract the boolean from Ok2 wrapper
+          console.log('Extracted verification result:', verificationResult);
+        } else if (verificationResult === undefined && result.resultXdr) {
+          // Fallback: try to decode from resultXdr
+          try {
+            const returnValue = result.resultXdr.returnValue();
+            verificationResult = returnValue === true || returnValue === 1;
+            console.log('Decoded return value:', returnValue, 'Verification result:', verificationResult);
+          } catch (e) {
+            console.log('Could not decode return value:', e);
           }
+        }
+
+        if (contractError !== null) {
+          // Contract returned an error
+          if (contractError === 1) {
+            outputText += `\n\n⚠ Verification succeeded but prize payout failed!
+
+Your proof was valid, but the contract couldn't transfer the prize. The contract may be out of funds or have other issues.`;
+          } else if (contractError === 2) {
+            outputText += `\n\n❌ Fee transfer failed.
+
+The contract couldn't collect the 1 XLM verification fee from your account.`;
+          } else if (contractError === 3) {
+            outputText += `\n\n⚠ Verification succeeded but no prize available!
+
+Your proof was valid, but the contract has no funds to pay out as a prize.`;
+          } else {
+            outputText += `\n\n❌ Contract error ${contractError}.
+
+An unexpected error occurred during verification.`;
+          }
+        } else if (verificationResult === true) {
+          outputText += `\n\n✓ Proof verification successful!
+
+Your solution was verified and you received the prize! 🎉`;
         } else {
-          outputText += `\n\n✗ Verification failed
+          outputText += `\n\n❌ Proof verification failed.
 
-The proof was submitted but verification failed. You paid the 1 XLM fee but did not claim the prize.`;
+Your proof was invalid. You paid the 1 XLM verification fee but did not receive the prize. Check your solution and try again.`;
+        }
+
+        if (cpuInstructions) {
+          outputText += `\nCPU Instructions: ${cpuInstructions.toLocaleString()}`;
+        }
+        if (txData.fee) {
+          const stroops = parseInt(txData.fee);
+          const xlm = StellarContractService.formatStroopsToXlm(txData.fee);
+          outputText += `\nFee: ${stroops.toLocaleString()} stroops (${xlm} XLM)`;
         }
       } catch (error: any) {
         // Refresh prize pool and wallet balance after verification attempt (even on error)
@@ -490,6 +681,8 @@ The proof was submitted but verification failed. You paid the 1 XLM fee but did 
           loadPrizePot();
           updateBalance();
         }, 2000);
+
+        console.error('Verification error:', error);
 
         outputText += `\n\n✗ Verification failed: ${error.message || String(error)}`;
       }

@@ -100,15 +100,39 @@ export class NoirService {
    * Loads the verification key for a circuit
    *
    * @param circuitName - Name of the circuit
-   * @returns Verification key as raw bytes
+   * @returns Preprocessed verification key as raw bytes
    */
   async loadVk(circuitName: string): Promise<Uint8Array> {
+    // Try to load preprocessed VK first (binary format expected by ultrahonk contract)
+    try {
+      const vkResponse = await fetch(`/circuits/${circuitName}_vk.bin`);
+      if (vkResponse.ok) {
+        const vkArrayBuffer = await vkResponse.arrayBuffer();
+        return new Uint8Array(vkArrayBuffer);
+      }
+    } catch (e) {
+      console.log('Preprocessed VK not found, falling back to JSON');
+    }
+
+    // Fallback to JSON format (for development/testing)
     const vkResponse = await fetch(`/circuits/${circuitName}_vk.json`);
     if (!vkResponse.ok) {
       throw new Error(`Failed to load VK for circuit: ${circuitName}`);
     }
-    const vkArrayBuffer = await vkResponse.arrayBuffer();
-    return new Uint8Array(vkArrayBuffer);
+    const vkJson = await vkResponse.json();
+
+    // Convert JSON array of hex strings to bytes
+    const vkBytes: number[] = [];
+    for (const hexStr of vkJson) {
+      // Remove 0x prefix if present
+      const cleanHex = hexStr.startsWith('0x') ? hexStr.slice(2) : hexStr;
+      // Convert to bytes (big-endian)
+      for (let i = 0; i < cleanHex.length; i += 2) {
+        vkBytes.push(parseInt(cleanHex.slice(i, i + 2), 16));
+      }
+    }
+
+    return new Uint8Array(vkBytes);
   }
 
   /**
