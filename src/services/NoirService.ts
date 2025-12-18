@@ -103,15 +103,28 @@ export class NoirService {
    * @returns Preprocessed verification key as raw bytes
    */
   async loadVk(circuitName: string): Promise<Uint8Array> {
-    // Try to load preprocessed VK first (binary format expected by ultrahonk contract)
+    // First try preprocessed VK (1824 bytes - contract compatible)
     try {
-      const vkResponse = await fetch(`/circuits/${circuitName}_vk.bin`);
+      const vkResponse = await fetch(`/circuits/${circuitName}_vk_preprocessed.bin`);
       if (vkResponse.ok) {
+        console.log(`[NoirService] Loaded preprocessed VK for ${circuitName}`);
         const vkArrayBuffer = await vkResponse.arrayBuffer();
         return new Uint8Array(vkArrayBuffer);
       }
     } catch (e) {
-      console.log('Preprocessed VK not found, falling back to JSON');
+      console.log('Preprocessed VK not found, this will cause contract errors');
+    }
+
+    // Fallback to binary format
+    try {
+      const vkResponse = await fetch(`/circuits/${circuitName}_vk.bin`);
+      if (vkResponse.ok) {
+        console.log(`[NoirService] Loaded binary VK for ${circuitName}`);
+        const vkArrayBuffer = await vkResponse.arrayBuffer();
+        return new Uint8Array(vkArrayBuffer);
+      }
+    } catch (e) {
+      console.log('Binary VK not found, falling back to JSON');
     }
 
     // Fallback to JSON format (for development/testing)

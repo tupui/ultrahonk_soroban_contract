@@ -6,6 +6,7 @@ import { usePrizePool } from '../contexts/PrizePoolContext';
 import { generateRandomSudoku } from '../util/sudokuGenerator';
 import { NoirService } from '../services/NoirService';
 import { getContractClient, StellarContractService } from '../services/StellarContractService';
+import { getGuessThePuzzleContractId } from '../contracts/util';
 import styles from './Sudoku.module.css';
 
 // Example puzzle data
@@ -403,91 +404,60 @@ Attempting to submit to smart contract to see contract-level validation...
             updateBalance();
           }, 2000);
 
-        // Check for contract errors in the transaction result
-        // Soroban contract errors are encoded in the result, not thrown as exceptions
-        let contractError: number | null = null;
-        let contractErrorDetails: any = null;
+        // The result is already the boolean return value from the contract
 
-        // Try different ways to extract contract errors
-        if (result.resultXdr) {
-          try {
-            // Check if resultXdr has contract error information
-            if (typeof result.resultXdr.contractError === 'function') {
-              const error = result.resultXdr.contractError();
-              if (error) {
-                contractError = error;
-                console.log('Contract error code (invalid proof):', contractError);
-              }
-            } else if (result.resultXdr._value && result.resultXdr._value._attributes) {
-              // Try accessing error through internal structure
-              const attrs = result.resultXdr._value._attributes;
-              if (attrs.error && attrs.error._value) {
-                contractError = attrs.error._value;
-                console.log('Contract error code (invalid proof alt):', contractError);
-              }
-            }
+        // Extract the actual boolean value from the Soroban result wrapper
+        let verificationResult: boolean;
+        const rawResult = result.result;
 
-            // Log the full resultXdr for debugging
-            console.log('Full resultXdr (invalid proof):', JSON.stringify(result.resultXdr, null, 2));
-          } catch (e) {
-            console.log('Error extracting contract error (invalid proof):', e);
-          }
+        if (rawResult && typeof rawResult === 'object' && 'value' in rawResult) {
+          // Soroban Ok2 wrapper: { value: boolean }
+          verificationResult = Boolean(rawResult.value);
+          console.log('Extracted verification result:', verificationResult);
+        } else if (typeof rawResult === 'boolean') {
+          // Direct boolean (unlikely but handle it)
+          verificationResult = rawResult;
+        } else {
+          // Unexpected format
+          console.log('Unexpected contract result:', rawResult);
+          verificationResult = false; // Default to failed
         }
 
-        // Also check if the result itself indicates an error
-        if (contractError === null && result.error) {
-          console.log('Transaction result error (invalid proof):', result.error);
-          contractErrorDetails = result.error;
-          // Try to extract error code from error object
-          if (typeof result.error === 'number') {
-            contractError = result.error;
-          } else if (result.error.code) {
-            contractError = result.error.code;
-          }
+        // Check if verification succeeded (true) or failed (false)
+        if (verificationResult === false) {
+          // Verification failed - this could be due to invalid proof or other contract logic
+          console.log('Contract verification failed - proof was invalid');
+        } else if (verificationResult === true) {
+          // Verification succeeded
+          console.log('Contract verification succeeded!');
+        } else {
+          console.log('Unexpected boolean result:', verificationResult);
         }
-
-        // Log additional transaction details for debugging
-        console.log('Transaction details (invalid proof):', {
-          hash: txData.txHash,
-          fee: txData.fee,
-          success: txData.success,
-          contractError,
-          contractErrorDetails,
-          resultType: typeof result.result,
-          resultValue: result.result
-        });
 
         // Check the return value - should be false for invalid proof
-        let verificationResult = result.result; // This is the Soroban result wrapper
+        let invalidProofResult: boolean;
+        const rawInvalidResult = result.result;
 
-        // Handle Soroban result wrapper - extract the actual boolean value
-        if (verificationResult && typeof verificationResult === 'object' && 'value' in verificationResult) {
-          verificationResult = verificationResult.value; // Extract the boolean from Ok2 wrapper
-          console.log('Extracted verification result (invalid proof):', verificationResult);
-        } else if (verificationResult === undefined && result.resultXdr) {
-          // Fallback: try to decode from resultXdr
-          try {
-            const returnValue = result.resultXdr.returnValue();
-            verificationResult = returnValue === true || returnValue === 1;
-            console.log('Decoded return value (invalid proof):', returnValue, 'Verification result:', verificationResult);
-          } catch (e) {
-            console.log('Could not decode return value (invalid proof):', e);
-          }
+        if (rawInvalidResult && typeof rawInvalidResult === 'object' && 'value' in rawInvalidResult) {
+          invalidProofResult = Boolean(rawInvalidResult.value);
+        } else if (typeof rawInvalidResult === 'boolean') {
+          invalidProofResult = rawInvalidResult;
+        } else {
+          invalidProofResult = false;
         }
 
-        if (contractError !== null) {
-          // Contract returned an error during invalid proof test
-          outputText += `\n\n⚠ Unexpected contract error during invalid proof test.
-
-Contract returned error ${contractError} instead of rejecting the invalid proof cleanly.`;
-        } else if (verificationResult === false) {
+        if (invalidProofResult === false) {
           outputText += `\n\n✓ Invalid proof correctly rejected by contract!
 
 The smart contract properly rejected the invalid proof, confirming that both client-side (Noir) and on-chain validation work correctly.`;
+        } else if (invalidProofResult === true) {
+          outputText += `\n\n⚠ Unexpected result from invalid proof test.
+
+Expected the contract to return false for an invalid proof, but got true. This may indicate an issue with the contract logic.`;
         } else {
           outputText += `\n\n⚠ Unexpected result from invalid proof test.
 
-Expected the contract to return false for an invalid proof, but got: ${verificationResult}. This may indicate an issue with the contract logic.`;
+Expected the contract to return false for an invalid proof, but got: ${invalidProofResult}. This may indicate an issue with the contract logic.`;
         }
 
         if (txData.fee) {
@@ -495,8 +465,8 @@ Expected the contract to return false for an invalid proof, but got: ${verificat
           const xlm = StellarContractService.formatStroopsToXlm(txData.fee);
           outputText += `\nFee: ${stroops.toLocaleString()} stroops (${xlm} XLM)`;
         }
-        } catch (contractError: any) {
-          console.error('Contract error during invalid proof test:', contractError);
+        } catch (error: any) {
+          console.error('Contract error during invalid proof test:', error);
 
           // Refresh prize pool and wallet balance after verification attempt (even on error)
           setTimeout(() => {
@@ -504,7 +474,7 @@ Expected the contract to return false for an invalid proof, but got: ${verificat
             updateBalance();
           }, 2000);
 
-          outputText += `\n\n✗ Unexpected error during invalid proof test: ${contractError.message}
+          outputText += `\n\n✗ Unexpected error during invalid proof test: ${error.message}
 
 This error occurred before the transaction was submitted, possibly during transaction preparation.`;
         }
@@ -565,106 +535,50 @@ STELLAR VERIFICATION
           updateBalance();
         }, 2000);
 
-        // Check for contract errors in the transaction result
-        // Soroban contract errors are encoded in the result, not thrown as exceptions
-        let contractError: number | null = null;
-        let contractErrorDetails: any = null;
+        // Extract the actual boolean value from the Soroban result wrapper
+        let finalVerificationResult: boolean;
+        const rawFinalResult = result.result;
+        console.log('Raw result from contract:', rawFinalResult);
+        console.log('Raw result type:', typeof rawFinalResult);
+        console.log('Raw result has value property:', rawFinalResult && typeof rawFinalResult === 'object' && 'value' in rawFinalResult);
 
-        // Try different ways to extract contract errors
-        if (result.resultXdr) {
-          try {
-            // Check if resultXdr has contract error information
-            if (typeof result.resultXdr.contractError === 'function') {
-              const error = result.resultXdr.contractError();
-              if (error) {
-                contractError = error;
-                console.log('Contract error code:', contractError);
-              }
-            } else if (result.resultXdr._value && result.resultXdr._value._attributes) {
-              // Try accessing error through internal structure
-              const attrs = result.resultXdr._value._attributes;
-              if (attrs.error && attrs.error._value) {
-                contractError = attrs.error._value;
-                console.log('Contract error code (alt):', contractError);
-              }
-            }
-
-            // Log the full resultXdr for debugging
-            console.log('Full resultXdr:', JSON.stringify(result.resultXdr, null, 2));
-          } catch (e) {
-            console.log('Error extracting contract error:', e);
-          }
+        if (rawFinalResult && typeof rawFinalResult === 'object' && 'value' in rawFinalResult) {
+          finalVerificationResult = Boolean(rawFinalResult.value);
+          console.log('Extracted value:', rawFinalResult.value, 'Converted to boolean:', finalVerificationResult);
+        } else if (typeof rawFinalResult === 'boolean') {
+          finalVerificationResult = rawFinalResult;
+          console.log('Direct boolean result:', finalVerificationResult);
+        } else {
+          finalVerificationResult = false;
+          console.log('Unexpected result format, defaulting to false');
         }
 
-        // Also check if the result itself indicates an error
-        if (contractError === null && result.error) {
-          console.log('Transaction result error:', result.error);
-          contractErrorDetails = result.error;
-          // Try to extract error code from error object
-          if (typeof result.error === 'number') {
-            contractError = result.error;
-          } else if (result.error.code) {
-            contractError = result.error.code;
-          }
+        // Check if verification succeeded (true) or failed (false)
+        if (finalVerificationResult === false) {
+          // Verification failed - this could be due to invalid proof or other contract logic
+          console.log('Contract verification failed - proof was invalid');
+        } else if (finalVerificationResult === true) {
+          // Verification succeeded
+          console.log('Contract verification succeeded!');
+        } else {
+          console.log('Unexpected boolean result:', finalVerificationResult);
         }
-
-        // Log additional transaction details for debugging
-        console.log('Transaction details:', {
-          hash: txData.txHash,
-          fee: txData.fee,
-          success: txData.success,
-          contractError,
-          contractErrorDetails,
-          resultType: typeof result.result,
-          resultValue: result.result
-        });
 
         // Check the return value - true means verification succeeded and prize was paid
         // false means proof was invalid but user paid the 1 XLM fee
-        let verificationResult = result.result; // This is the Soroban result wrapper
 
-        // Handle Soroban result wrapper - extract the actual boolean value
-        if (verificationResult && typeof verificationResult === 'object' && 'value' in verificationResult) {
-          verificationResult = verificationResult.value; // Extract the boolean from Ok2 wrapper
-          console.log('Extracted verification result:', verificationResult);
-        } else if (verificationResult === undefined && result.resultXdr) {
-          // Fallback: try to decode from resultXdr
-          try {
-            const returnValue = result.resultXdr.returnValue();
-            verificationResult = returnValue === true || returnValue === 1;
-            console.log('Decoded return value:', returnValue, 'Verification result:', verificationResult);
-          } catch (e) {
-            console.log('Could not decode return value:', e);
-          }
-        }
-
-        if (contractError !== null) {
-          // Contract returned an error
-          if (contractError === 1) {
-            outputText += `\n\n⚠ Verification succeeded but prize payout failed!
-
-Your proof was valid, but the contract couldn't transfer the prize. The contract may be out of funds or have other issues.`;
-          } else if (contractError === 2) {
-            outputText += `\n\n❌ Fee transfer failed.
-
-The contract couldn't collect the 1 XLM verification fee from your account.`;
-          } else if (contractError === 3) {
-            outputText += `\n\n⚠ Verification succeeded but no prize available!
-
-Your proof was valid, but the contract has no funds to pay out as a prize.`;
-          } else {
-            outputText += `\n\n❌ Contract error ${contractError}.
-
-An unexpected error occurred during verification.`;
-          }
-        } else if (verificationResult === true) {
+        if (finalVerificationResult === true) {
           outputText += `\n\n✓ Proof verification successful!
 
 Your solution was verified and you received the prize! 🎉`;
-        } else {
+        } else if (finalVerificationResult === false) {
           outputText += `\n\n❌ Proof verification failed.
 
 Your proof was invalid. You paid the 1 XLM verification fee but did not receive the prize. Check your solution and try again.`;
+        } else {
+          outputText += `\n\n⚠️ Unexpected verification result.
+
+Received: ${finalVerificationResult}. Please check the contract logs for details.`;
         }
 
         if (cpuInstructions) {

@@ -36,10 +36,13 @@ From there you can run `nargo` to verify your circuit and use `bb` to make proof
 ```bash
 // 
 nargo compile
-bb write_vk -b target/zcore_zk.json -o target --scheme ultra_honk --oracle_hash keccak --output_format bytes_and_fields
+bb write_vk -b target/noir_sudoku.json -o target --scheme ultra_honk --oracle_hash keccak --output_format bytes_and_fields
 ```
 
-This creates a `target/vk_fields.json` which you need to copy to the frontend under `public/circuits`.
+This creates a `target/vk_fields.json` we then need to create a bin format:
+```bash
+preprocess_vk_cli vk_fields.json public/circuits
+```
 
 ### Getting started
 
