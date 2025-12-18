@@ -7,6 +7,7 @@
 
 import { Buffer } from 'buffer';
 import { createGuessThePuzzleClient } from '../contracts/guess_the_puzzle';
+import { SorobanRpc } from '@stellar/stellar-sdk';
 
 /**
  * Transaction data extracted from a transaction result
@@ -94,8 +95,36 @@ export class StellarContractService {
   }
 
   /**
+   * Extract return value from a Soroban transaction result
+   *
+   * @param server - Soroban RPC server instance
+   * @param txHash - Transaction hash
+   * @returns Promise resolving to the return value or null if not available
+   */
+  static async extractReturnValue(server: SorobanRpc.Server, txHash: string): Promise<boolean | null> {
+    try {
+      const txResponse = await server.getTransaction(txHash);
+
+      // Check if transaction was successful and has a return value
+      if (SorobanRpc.Api.isSuccessful(txResponse) && txResponse.returnValue) {
+        // The return value is a ScVal (Soroban Value) in XDR format
+        // For boolean values, we can extract the boolean value
+        const scVal = txResponse.returnValue;
+        if (scVal.switch() === SorobanRpc.xdr.ScValType.scvBool()) {
+          return scVal.bool();
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to extract return value:', error);
+      return null;
+    }
+  }
+
+  /**
    * Format stroops to XLM
-   * 
+   *
    * @param stroops - Amount in stroops (string or number)
    * @returns Formatted XLM amount as string
    */

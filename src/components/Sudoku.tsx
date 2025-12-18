@@ -6,6 +6,8 @@ import { usePrizePool } from '../contexts/PrizePoolContext';
 import { generateRandomSudoku } from '../util/sudokuGenerator';
 import { NoirService } from '../services/NoirService';
 import { getContractClient, StellarContractService } from '../services/StellarContractService';
+import { SorobanRpc } from '@stellar/stellar-sdk';
+import { rpcUrl } from '../contracts/util';
 import styles from './Sudoku.module.css';
 
 // Example puzzle data
@@ -365,15 +367,22 @@ Attempting to submit to smart contract to see contract-level validation...
           contractClient.options.publicKey = address;
           const vkBuffer = StellarContractService.toBuffer(vkJson);
           const proofBuffer = StellarContractService.toBuffer(proofBlob);
+          const publicInputsBuffer = StellarContractService.toBuffer(publicInputsBytes);
 
           const tx = await contractClient.verify_puzzle({
             guesser: address,
             vk_json: vkBuffer,
+            public_inputs: publicInputsBuffer,
             proof_blob: proofBuffer,
           });
 
           const result = await tx.signAndSend({ signTransaction: walletSignTransaction });
           const txData = StellarContractService.extractTransactionData(result);
+
+          // Wait a bit for transaction to be processed, then get the return value
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          const server = new SorobanRpc.Server(rpcUrl, { allowHttp: true });
+          const returnValue = await StellarContractService.extractReturnValue(server, txData.txHash!);
 
           // Refresh prize pool and wallet balance after verification attempt
           setTimeout(() => {
@@ -381,12 +390,12 @@ Attempting to submit to smart contract to see contract-level validation...
             updateBalance();
           }, 2000);
 
-          if (txData.success) {
-            outputText += `\n⚠️ Unexpected: Contract accepted invalid proof!`;
-          } else {
-            outputText += `\n\n✗ Contract Verification Failed (as expected)
+          if (returnValue === false) {
+            outputText += `\n\n✓ Contract Verification Failed (as expected)
 
 The smart contract also rejected the invalid proof, confirming that both client-side (Noir) and on-chain validation work correctly.`;
+          } else {
+            outputText += `\n⚠️ Unexpected: Contract accepted invalid proof!`;
           }
         } catch (contractError: any) {
           // Refresh prize pool and wallet balance after verification attempt (even on error)
@@ -429,10 +438,12 @@ STELLAR VERIFICATION
         contractClient.options.publicKey = address;
         const vkBuffer = StellarContractService.toBuffer(proofResult.vkJson);
         const proofBuffer = StellarContractService.toBuffer(proofResult.proofBlob);
+        const publicInputsBuffer = StellarContractService.toBuffer(proofResult.publicInputs);
 
         const tx = await contractClient.verify_puzzle({
           guesser: address,
           vk_json: vkBuffer,
+          public_inputs: publicInputsBuffer,
           proof_blob: proofBuffer,
         });
 
@@ -440,16 +451,22 @@ STELLAR VERIFICATION
         const result = await tx.signAndSend({ signTransaction: walletSignTransaction });
         const txData = StellarContractService.extractTransactionData(result);
 
+        // Wait a bit for transaction to be processed, then get the return value
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        const server = new SorobanRpc.Server(rpcUrl, { allowHttp: true });
+        const returnValue = await StellarContractService.extractReturnValue(server, txData.txHash!);
+
         // Refresh prize pool and wallet balance after verification attempt
         setTimeout(() => {
           loadPrizePot();
           updateBalance();
         }, 2000);
 
-        if (txData.success) {
+        if (returnValue === true) {
           outputText += `\n\n✓ Proof verified on Stellar!
 
-Verification Status: ✓ VERIFIED`;
+Verification Status: ✓ VERIFIED
+Prize claimed successfully!`;
 
           if (txData.txHash) {
             outputText += `\nTransaction Hash: ${txData.txHash}`;
@@ -463,7 +480,9 @@ Verification Status: ✓ VERIFIED`;
             outputText += `\nFee: ${stroops.toLocaleString()} stroops (${xlm} XLM)`;
           }
         } else {
-          outputText += `\n\n✗ Verification failed`;
+          outputText += `\n\n✗ Verification failed
+
+The proof was submitted but verification failed. You paid the 1 XLM fee but did not claim the prize.`;
         }
       } catch (error: any) {
         // Refresh prize pool and wallet balance after verification attempt (even on error)
