@@ -6,12 +6,16 @@ import { usePrizePool } from '../contexts/PrizePoolContext';
 import { generateRandomSudoku } from '../util/sudokuGenerator';
 import { NoirService } from '../services/NoirService';
 import { getContractClient, StellarContractService } from '../services/StellarContractService';
-import { getGuessThePuzzleContractId } from '../contracts/util';
 import styles from './Sudoku.module.css';
 
 // Example puzzle data
 const EXAMPLE_PUZZLE = [5,3,0,0,7,0,0,0,0,6,0,0,1,9,5,0,0,0,0,9,8,0,0,0,0,6,0,8,0,0,0,6,0,0,0,3,4,0,0,8,0,3,0,0,1,7,0,0,0,2,0,0,0,6,0,6,0,0,0,0,2,8,0,0,0,0,4,1,9,0,0,5,0,0,0,0,8,0,0,7,9];
 const EXAMPLE_SOLUTION = [5,3,4,6,7,8,9,1,2,6,7,2,1,9,5,3,4,8,1,9,8,3,4,2,5,6,7,8,5,9,7,6,1,4,2,3,4,2,6,8,5,3,7,9,1,7,1,3,9,2,4,8,5,6,9,6,1,5,3,7,2,8,4,2,8,7,4,1,9,6,3,5,3,4,5,2,8,6,1,7,9];
+
+// Helper function to extract boolean result from Soroban contract response
+const extractVerificationResult = (result: any): boolean => {
+  return result.result?.value ?? false;
+};
 
 export const Sudoku: React.FC = () => {
   const { address, signTransaction } = useWallet();
@@ -371,15 +375,7 @@ Attempting to submit to smart contract to see contract-level validation...
           // Send the properly encoded public inputs
           const publicInputsBuffer = StellarContractService.toBuffer(publicInputsBytes);
 
-          console.log('=== CONTRACT CALL DEBUG (INVALID PROOF) ===');
-          console.log('Contract ID:', getGuessThePuzzleContractId());
-          console.log('Guesser address:', address);
-          console.log('VK buffer length:', vkBuffer.length, 'bytes');
-          console.log('Public inputs buffer length:', publicInputsBuffer.length, 'bytes');
-          console.log('Proof buffer length:', proofBuffer.length, 'bytes');
-          console.log('VK buffer first 32 bytes:', Array.from(vkBuffer.slice(0, 32)));
-          console.log('Public inputs first 32 bytes:', Array.from(publicInputsBuffer.slice(0, 32)));
-          console.log('Proof first 32 bytes:', Array.from(proofBuffer.slice(0, 32)));
+          console.log('Submitting invalid proof test...');
 
           const tx = await contractClient.verify_puzzle({
             guesser: address,
@@ -404,60 +400,17 @@ Attempting to submit to smart contract to see contract-level validation...
             updateBalance();
           }, 2000);
 
-        // The result is already the boolean return value from the contract
-
-        // Extract the actual boolean value from the Soroban result wrapper
-        let verificationResult: boolean;
-        const rawResult = result.result;
-
-        if (rawResult && typeof rawResult === 'object' && 'value' in rawResult) {
-          // Soroban Ok2 wrapper: { value: boolean }
-          verificationResult = Boolean(rawResult.value);
-          console.log('Extracted verification result:', verificationResult);
-        } else if (typeof rawResult === 'boolean') {
-          // Direct boolean (unlikely but handle it)
-          verificationResult = rawResult;
-        } else {
-          // Unexpected format
-          console.log('Unexpected contract result:', rawResult);
-          verificationResult = false; // Default to failed
-        }
-
-        // Check if verification succeeded (true) or failed (false)
-        if (verificationResult === false) {
-          // Verification failed - this could be due to invalid proof or other contract logic
-          console.log('Contract verification failed - proof was invalid');
-        } else if (verificationResult === true) {
-          // Verification succeeded
-          console.log('Contract verification succeeded!');
-        } else {
-          console.log('Unexpected boolean result:', verificationResult);
-        }
+        // Extract verification result
+        const verificationResult = extractVerificationResult(result);
+        console.log(verificationResult ? 'Contract verification succeeded!' : 'Contract verification failed - proof was invalid');
 
         // Check the return value - should be false for invalid proof
-        let invalidProofResult: boolean;
-        const rawInvalidResult = result.result;
-
-        if (rawInvalidResult && typeof rawInvalidResult === 'object' && 'value' in rawInvalidResult) {
-          invalidProofResult = Boolean(rawInvalidResult.value);
-        } else if (typeof rawInvalidResult === 'boolean') {
-          invalidProofResult = rawInvalidResult;
-        } else {
-          invalidProofResult = false;
-        }
+        const invalidProofResult = extractVerificationResult(result);
 
         if (invalidProofResult === false) {
-          outputText += `\n\n✓ Invalid proof correctly rejected by contract!
-
-The smart contract properly rejected the invalid proof, confirming that both client-side (Noir) and on-chain validation work correctly.`;
-        } else if (invalidProofResult === true) {
-          outputText += `\n\n⚠ Unexpected result from invalid proof test.
-
-Expected the contract to return false for an invalid proof, but got true. This may indicate an issue with the contract logic.`;
+          outputText += `\n\n✓ Invalid proof correctly rejected by contract!\n\nThe smart contract properly rejected the invalid proof, confirming that both client-side (Noir) and on-chain validation work correctly.`;
         } else {
-          outputText += `\n\n⚠ Unexpected result from invalid proof test.
-
-Expected the contract to return false for an invalid proof, but got: ${invalidProofResult}. This may indicate an issue with the contract logic.`;
+          outputText += `\n\n⚠ Unexpected result: contract accepted invalid proof.\n\nThis may indicate an issue with the contract validation logic.`;
         }
 
         if (txData.fee) {
@@ -484,16 +437,7 @@ This error occurred before the transaction was submitted, possibly during transa
     } else if (proofResult) {
       // Noir succeeded, proceed with normal flow
       outputText = `
-✓ Proof generated successfully!
-
-Proof ID: ${proofResult.proofId}
-Proof Size: ${proofResult.proof.length} bytes
-Public Inputs: ${proofResult.publicInputs.length} bytes
-VK Size: ${proofResult.vkJson.length} bytes
-Time: ${proofResult.proofTime}s
-
-Proof Blob (first 100 bytes):
-${Array.from((proofResult.proofBlob as Uint8Array).slice(0, 100)).map((byte) => byte.toString(16).padStart(2, '0')).join(' ')}...
+✓ Proof generated successfully! (${proofResult.proofTime}s)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STELLAR VERIFICATION
@@ -535,68 +479,16 @@ STELLAR VERIFICATION
           updateBalance();
         }, 2000);
 
-        // Extract the actual boolean value from the Soroban result
-        let finalVerificationResult: boolean;
-        const rawResult = result.result;
-        console.log('Contract result:', rawResult);
-        console.log('Contract result type:', typeof rawResult);
-
-        // The contract bindings should already parse the XDR result into a boolean
-        // But Soroban wraps results, so we need to handle the wrapper
-        if (typeof rawResult === 'boolean') {
-          finalVerificationResult = rawResult;
-          console.log('Direct boolean result:', finalVerificationResult);
-        } else if (rawResult && typeof rawResult === 'object') {
-          // Check for Soroban result wrapper
-          if ('value' in rawResult) {
-            const value = rawResult.value;
-            if (typeof value === 'boolean') {
-              finalVerificationResult = value;
-              console.log('Unwrapped boolean result:', finalVerificationResult);
-            } else if (value && typeof value === 'object' && 'value' in value) {
-              // Double-wrapped case
-              finalVerificationResult = Boolean(value.value);
-              console.log('Double-unwrapped boolean result:', finalVerificationResult);
-            } else {
-              finalVerificationResult = Boolean(value);
-              console.log('Converted value to boolean:', finalVerificationResult);
-            }
-          } else {
-            // Fallback: try to convert the object to boolean
-            finalVerificationResult = Boolean(rawResult);
-            console.log('Fallback boolean conversion:', finalVerificationResult);
-          }
-        } else {
-          finalVerificationResult = false;
-          console.log('Unexpected result type, defaulting to false');
-        }
-
-        // Check if verification succeeded (true) or failed (false)
-        if (finalVerificationResult === false) {
-          // Verification failed - this could be due to invalid proof or other contract logic
-          console.log('Contract verification failed - proof was invalid');
-        } else if (finalVerificationResult === true) {
-          // Verification succeeded
-          console.log('Contract verification succeeded!');
-        } else {
-          console.log('Unexpected boolean result:', finalVerificationResult);
-        }
+        // Extract verification result
+        const finalVerificationResult = extractVerificationResult(result);
+        console.log(finalVerificationResult ? 'Contract verification succeeded!' : 'Contract verification failed - proof was invalid');
 
         // Check the return value - true means verification succeeded and prize was paid
         // false means proof was invalid but user paid the 1 XLM fee
-
-        if (finalVerificationResult === true) {
-          outputText += `\n\n✓ Proof verification successful!
-
-Your solution was verified and you received the prize! 🎉`;
-        } else if (finalVerificationResult === false) {
-          outputText += `\n\n❌ Proof verification failed.
-
-Your proof was invalid. You paid the 1 XLM verification fee but did not receive the prize. Check your solution and try again.`;
+        if (finalVerificationResult) {
+          outputText += `\n\n✓ Proof verification successful!\n\nYour solution was verified and you received the prize! 🎉`;
         } else {
-          outputText += `\n\n⚠️ Unexpected verification result.
-
-Received: ${finalVerificationResult}. Please check the contract logs for details.`;
+          outputText += `\n\n❌ Proof verification failed.\n\nYour proof was invalid. You paid the 1 XLM verification fee but did not receive the prize. Check your solution and try again.`;
         }
 
         if (cpuInstructions) {

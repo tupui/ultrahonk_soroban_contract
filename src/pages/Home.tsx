@@ -18,8 +18,7 @@ const Home: React.FC = () => {
         </Text>
 
         <Text as="p" size="md">
-          To validate the proof you either need to use a local node or select the NOIR network.
-          In your wallet, use the following RPC https://noir-local.stellar.buzz/soroban/rpc and Horizon URL https://noir-local.stellar.buzz
+          To validate the proof you either need to use a local node or select the Futurenet network.
         </Text>
         
         <Box gap="md" direction="column" style={{ marginTop: "2rem" }}>
