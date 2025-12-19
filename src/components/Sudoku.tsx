@@ -535,22 +535,40 @@ STELLAR VERIFICATION
           updateBalance();
         }, 2000);
 
-        // Extract the actual boolean value from the Soroban result wrapper
+        // Extract the actual boolean value from the Soroban result
         let finalVerificationResult: boolean;
-        const rawFinalResult = result.result;
-        console.log('Raw result from contract:', rawFinalResult);
-        console.log('Raw result type:', typeof rawFinalResult);
-        console.log('Raw result has value property:', rawFinalResult && typeof rawFinalResult === 'object' && 'value' in rawFinalResult);
+        const rawResult = result.result;
+        console.log('Contract result:', rawResult);
+        console.log('Contract result type:', typeof rawResult);
 
-        if (rawFinalResult && typeof rawFinalResult === 'object' && 'value' in rawFinalResult) {
-          finalVerificationResult = Boolean(rawFinalResult.value);
-          console.log('Extracted value:', rawFinalResult.value, 'Converted to boolean:', finalVerificationResult);
-        } else if (typeof rawFinalResult === 'boolean') {
-          finalVerificationResult = rawFinalResult;
+        // The contract bindings should already parse the XDR result into a boolean
+        // But Soroban wraps results, so we need to handle the wrapper
+        if (typeof rawResult === 'boolean') {
+          finalVerificationResult = rawResult;
           console.log('Direct boolean result:', finalVerificationResult);
+        } else if (rawResult && typeof rawResult === 'object') {
+          // Check for Soroban result wrapper
+          if ('value' in rawResult) {
+            const value = rawResult.value;
+            if (typeof value === 'boolean') {
+              finalVerificationResult = value;
+              console.log('Unwrapped boolean result:', finalVerificationResult);
+            } else if (value && typeof value === 'object' && 'value' in value) {
+              // Double-wrapped case
+              finalVerificationResult = Boolean(value.value);
+              console.log('Double-unwrapped boolean result:', finalVerificationResult);
+            } else {
+              finalVerificationResult = Boolean(value);
+              console.log('Converted value to boolean:', finalVerificationResult);
+            }
+          } else {
+            // Fallback: try to convert the object to boolean
+            finalVerificationResult = Boolean(rawResult);
+            console.log('Fallback boolean conversion:', finalVerificationResult);
+          }
         } else {
           finalVerificationResult = false;
-          console.log('Unexpected result format, defaulting to false');
+          console.log('Unexpected result type, defaulting to false');
         }
 
         // Check if verification succeeded (true) or failed (false)
