@@ -9,7 +9,7 @@ use soroban_sdk::{
 use ultrahonk_rust_verifier::{
     ec,
     hash::{self, HashOps},
-    UltraHonkVerifier, PROOF_BYTES,
+    verifier::UltraHonkVerifier,
 };
 
 mod backend;
@@ -64,9 +64,9 @@ impl UltraHonkVerifierContract {
         hash::set_soroban_hash_backend(Box::new(SorobanKeccak::new(&env)));
         ec::set_soroban_bn254_backend(Box::new(SorobanBn254::new(&env)));
         let proof_vec: StdVec<u8> = proof_bytes.to_alloc_vec();
-        if proof_vec.len() != PROOF_BYTES {
-            return Err(Error::ProofParseError);
-        }
+        // if proof_vec.len() != PROOF_BYTES {
+        //     return Err(Error::ProofParseError);
+        // }
 
         // Deserialize preprocessed verification key bytes
         let vk_vec: StdVec<u8> = vk_bytes.to_alloc_vec();
